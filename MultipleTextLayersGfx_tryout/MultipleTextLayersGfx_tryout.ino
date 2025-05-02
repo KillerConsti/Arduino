@@ -137,7 +137,7 @@ SMARTMATRIX_ALLOCATE_GFX_MONO_LAYER(scrollingLayer02, kMatrixWidth, kMatrixHeigh
 //SMARTMATRIX_ALLOCATE_GFX_MONO_LAYER(scrollingLayer03, kMatrixWidth, kMatrixHeight, 224, 40, COLOR_DEPTH, kScrollingLayerOptions);
 const uint8_t kIndexedLayerOptions = (SM_INDEXED_OPTIONS_NONE);
 SMARTMATRIX_ALLOCATE_INDEXED_LAYER(scrollingLayer03, kMatrixWidth, kMatrixHeight, COLOR_DEPTH, kIndexedLayerOptions);
-SMARTMATRIX_ALLOCATE_INDEXED_LAYER(scrollingLayer00, kMatrixWidth, kMatrixHeight, COLOR_DEPTH, kIndexedLayerOptions);
+SMARTMATRIX_ALLOCATE_INDEXED_LAYER(points_match1, kMatrixWidth, kMatrixHeight, COLOR_DEPTH, kIndexedLayerOptions);
 SMARTMATRIX_ALLOCATE_INDEXED_LAYER(backgroundLayer, kMatrixWidth, kMatrixHeight, COLOR_DEPTH, kIndexedLayerOptions);
 
 SMARTMATRIX_ALLOCATE_INDEXED_LAYER(sets_match1_layer, kMatrixWidth, kMatrixHeight, COLOR_DEPTH, kIndexedLayerOptions);
@@ -232,7 +232,7 @@ void fillnoise8() {
 void setup() {
   Serial.begin(115200);
 
-  delay(2000);
+  delay(500);
 
   randomSeed(analogRead(0));
 #ifdef INCLUDE_FASTLED_BACKGROUND
@@ -245,7 +245,7 @@ void setup() {
 #endif
 
 matrix.addLayer(&backgroundLayer);
-  matrix.addLayer(&scrollingLayer00); 
+  matrix.addLayer(&points_match1); 
   //matrix.addLayer(&scrollingLayer01); 
   //matrix.addLayer(&scrollingLayer02); 
   matrix.addLayer(&scrollingLayer03); 
@@ -256,15 +256,14 @@ matrix.addLayer(&points_match2);
 matrix.addLayer(&sets_match2);
   matrix.begin();
 
-  scrollingLayer00.setColor(rgb24(0, 255, 0));
+  points_match1.setColor(rgb24(0, 255, 0));
   scrollingLayer01.setColor(chooseRandomBrightColor());
   scrollingLayer02.setColor(chooseRandomBrightColor());
   scrollingLayer03.setColor(rgb24(0, 40, 255));
 
-  scrollingLayer00.setSpeed(0);
+  points_match1.setSpeed(0);
   scrollingLayer01.setSpeed(0);
   scrollingLayer02.setSpeed(0);
-  scrollingLayer00.setFont(&FreeMono12pt7b);
   scrollingLayer01.setFont(&FreeMonoBold18pt7b);
   scrollingLayer02.setFont(&FreeSerif24pt7b);
 
@@ -283,10 +282,10 @@ matrix.addLayer(&sets_match2);
         scrollingLayer03.println("Team 2");
        scrollingLayer03.swapBuffers(false);
 
-       scrollingLayer00.setFont(&FreeSans10pt7b);
-       scrollingLayer00.setCursor(75, 15);
-       scrollingLayer00.println("00:25");
-      scrollingLayer00.swapBuffers(false);
+       points_match1.setFont(&FreeSans10pt7b);
+       points_match1.setCursor(75, 15);
+       points_match1.println("00:25");
+      points_match1.swapBuffers(false);
        backgroundLayer.setColor(rgb24(0, 180, 180));
       backgroundLayer.drawRect(0, 0, 128,32, 0xFFE0);
       backgroundLayer.drawRect(0, 32, 128,32, 0xFFE0);
@@ -353,7 +352,7 @@ bool NewRadioEvent()
     Serial.println("Radio Msg short recieved");
      return RecievedMatchDataShort();
   }
-  _radio.discardData(packetSize);
+  //_radio.discardData(packetSize);
     return false;
 
 
@@ -395,8 +394,6 @@ bool RecievedMatchDataShort()
       uint8_t sender = _radio_matchDataShort.FromRadioId;
     if(sender != 0)
     return false;
-      if(sender != 0)
-    return false;
     Match* MyMatch = &mMatch1;
     if(_radio_matchDataShort.MatchNum == 2)
     {
@@ -406,6 +403,8 @@ bool RecievedMatchDataShort()
     {
       MyMatch = &mMatch3;
     }
+    Serial.print("MatchNum");
+    Serial.println(_radio_matchDataShort.MatchNum);
     MyMatch->T1_point = _radio_matchDataShort.T1_Score;
     MyMatch->T2_point = _radio_matchDataShort.T2_Score;
     MyMatch->T1_sets = _radio_matchDataShort.T1_Sets;
@@ -415,21 +414,22 @@ bool RecievedMatchDataShort()
     return true;
 }
 void loop() {
-  if(!NewRadioEvent())
+  if(NewRadioEvent())
   {
-    delay(20);
-    return;
   }
   if(mRadioChangeEvent.LittleDataChange)
   {
+      Serial.println("we recieved little data change");
       PerformLittleDataChange();
       mRadioChangeEvent.LittleDataChange = false;
   }
   else if (mRadioChangeEvent.BigDataChange)
   {
+    Serial.println("we recieved big data change");
       PerformBigDataChange();
       mRadioChangeEvent.BigDataChange = false;
   }
+  delay(20);
 }
 
 void PerformLittleDataChange()
@@ -437,35 +437,33 @@ void PerformLittleDataChange()
 //set correct layers to manipulate
     if(mRadioChangeEvent.MatchNum == 1)
     {
-        scrollingLayer00.fillScreen(0);
-       scrollingLayer00.setCursor(75, 15);
        uint8_t i = mMatch1.T1_point;
        uint8_t j = mMatch1.T2_point;
        uint8_t x = mMatch1.T1_sets;
        uint8_t y = mMatch1.T2_sets;
 
-      scrollingLayer00.fillScreen(0);
-       scrollingLayer00.setCursor(75, 15);
+      points_match1.fillScreen(0);
+       points_match1.setCursor(75, 15);
         if(i > 99)
         {
           i = 0;
         }
         if(i < 10)
         {
-          scrollingLayer00.print(0);
+          points_match1.print(0);
         }
-        scrollingLayer00.print(i);
-        scrollingLayer00.print(":");
+        points_match1.print(i);
+        points_match1.print(":");
         if(j > 99)
         {
           j = 0;
         }
         if(j < 10)
         {
-          scrollingLayer00.print(0);
+          points_match1.print(0);
         }
-        scrollingLayer00.print(j);
-        scrollingLayer00.swapBuffers(false);
+        points_match1.print(j);
+        points_match1.swapBuffers(false);
     
   }
   else if (mRadioChangeEvent.MatchNum == 2)
@@ -496,6 +494,15 @@ void PerformLittleDataChange()
           points_match2.print(0);
         }
         points_match2.print(j);
+        points_match2.swapBuffers(false);
+        sets_match2.fillScreen(0);
+        sets_match2.setCursor(86, 21+32);
+        sets_match2.print("(");
+        sets_match2.print(x);
+        sets_match2.print(":");
+        sets_match2.print(y);
+        sets_match2.print(")");
+        sets_match2.swapBuffers(false);
 }
 }
 void PerformBigDataChange()

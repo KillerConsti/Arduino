@@ -186,6 +186,7 @@ BLECharacteristic* pt2Characteristic = NULL;
 BLECharacteristic* ps1Characteristic = NULL;
 BLECharacteristic* ps2Characteristic = NULL;
 BLECharacteristic* cmdCharacteristic = NULL;
+BLECharacteristic* TeamNameCharacteristic = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint32_t value = 0;
@@ -194,6 +195,8 @@ bool NeedToNotifyBLE = false;
 bool NeedToNotifyTFT = false;
 bool NeedToNotifyRadio = false;
 bool mUpdateScreenColor = false;
+//bool is stupid here
+bool NeedToNotifyLEDShort;
 //Need this 3 times
 typedef struct
 {
@@ -209,6 +212,8 @@ struct ScoreBoard_over_Raio {
   uint8_t mT2 = 0;
   uint8_t mS1 = 0;
   uint8_t mS2 = 0;
+  char TeamName1[12];
+  char TeamName2[12];
   VolleyBallHistory MyVolleyHistory[5];
   uint16_t BackgroundColor;
 };
@@ -218,7 +223,7 @@ uint8_t mCurrentRadioID = 0;
 ScoreBoard_over_Raio mRadioScores[3];
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
-
+char MatchNameData[12][45];
 const uint16_t KC_red = 63488;
 const uint16_t KC_grey = 2113;
 const uint16_t KC_dirty_white = 61309;
@@ -232,6 +237,7 @@ const uint16_t KC_dark_blue = 53;
 #define S1_CHARACTERISTIC_UUID "19b10004-e8f2-537e-4f6c-d104768a1214"
 #define S2_CHARACTERISTIC_UUID "19b10005-e8f2-537e-4f6c-d104768a1214"
 #define CMD_CHARACTERISTIC_UUID "19b10005-e8f2-537e-4f6c-d104768a1215"
+#define mTeamNameCharaceristic "19b10006-e8f2-537e-4f6c-d104768a1214"
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
@@ -397,6 +403,60 @@ class MyCharacteristicCallbacksCMD
   }
 };
 
+/*
+The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
+*/
+class MyCharacteristicCallbacksTeamNames
+  : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* TeamNameCharacteristic) {
+    String value = TeamNameCharacteristic->getValue();
+    if (value.length() > 0) {
+
+      //Serial.print("Team Names written: ");
+      //Serial.println(value);  // Print the integer value
+      Serial.println(TeamNameCharacteristic->getLength());
+      char TeamName[13];
+      int LastFinish = 0;
+      for(size_t t= 0 ; t < TeamNameCharacteristic->getLength();t++)
+      {
+        //Serial.print(t);
+        //Serial.print(" ");
+        //Serial.println(value[t]);
+        char CurrentVal = value[t];
+        if(CurrentVal ==':')
+        {
+          for(size_t u = t-LastFinish ; u < 12;u++)
+          {
+            TeamName[u] = ' ';
+          }
+          TeamName[12] = '\0';
+          Serial.print(TeamName);
+          LastFinish =t+1;
+          continue;
+        }
+        else if (CurrentVal =='\n')
+        {
+          Serial.print("found new line ");
+                    for(size_t u = t-LastFinish ; u < 12;u++)
+                              {
+            TeamName[u] = ' ';
+          }
+          TeamName[12] = '\0';
+          Serial.println(TeamName);
+
+          LastFinish =t+1;
+          continue;
+        }
+        else 
+        {
+          TeamName[t-LastFinish] = value[t];
+          
+        }
+      }
+    }
+  }
+};
+
 void UpdateScreenColor() {
   Serial.print("Update Screen Color ");
   Serial.println(mCurrentRadioID);
@@ -431,19 +491,34 @@ void SendMatchDataShortToScoreBoard(int MatchNum)
   mMatchDataShort.T1_Sets = mRadioScores[MatchNum].mS1;
   mMatchDataShort.T2_Sets = mRadioScores[MatchNum].mS2;
   mMatchDataShort.MatchNum =MatchNum+1;
-  _radio.send(8, &mMatchDataShort, sizeof(mMatchDataShort));
+  Serial.print("send data short to LED board ");
+  
+  if(_radio.send(8, &mMatchDataShort, sizeof(mMatchDataShort)))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
 }
 //Communication with ScoreBoard
 
 
 void setup(void) {
   Serial.begin(9600);
-  attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
   pinMode(mDrehschalter._CLK,INPUT);
   pinMode(mDrehschalter._DT,INPUT);
   pinMode(mDrehschalter._SW,INPUT);
+  
+      /*if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+    Serial.println("Cannot communicate with radio");
+    //while (1)
+      ;  // Wait here forever.
+  }*/
   tft.begin();
-      if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN,NRFLite::BITRATE2MBPS,100,1)) {
+  if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
@@ -519,36 +594,26 @@ void setup(void) {
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Create the BLE Service
-  BLEService* pService = pServer->createService(BLEUUID(SERVICE_UUID), 20, (uint8_t)0);
+  BLEService* pService = pServer->createService(BLEUUID(SERVICE_UUID), 40, (uint8_t)0);
 
   // Create a BLE Characteristic
   pSensorCharacteristic = pService->createCharacteristic(
-    SENSOR_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
+    SENSOR_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
 
   // Create the ON button Characteristic
-  pt1Characteristic = pService->createCharacteristic(
-    T1_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE);
-  pt2Characteristic = pService->createCharacteristic(
-    T2_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE);
-  ps1Characteristic = pService->createCharacteristic(
-    S1_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE);
-  ps2Characteristic = pService->createCharacteristic(
-    S2_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE);
-  cmdCharacteristic = pService->createCharacteristic(
-    CMD_CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE);
+  pt1Characteristic = pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+  pt2Characteristic = pService->createCharacteristic(T2_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_WRITE);
+  ps1Characteristic = pService->createCharacteristic(S1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+  ps2Characteristic = pService->createCharacteristic(S2_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+  cmdCharacteristic = pService->createCharacteristic(CMD_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+  TeamNameCharacteristic = pService->createCharacteristic(mTeamNameCharaceristic,BLECharacteristic::PROPERTY_WRITE);
   // Register the callback for the ON button characteristic
   pt1Characteristic->setCallbacks(new MyCharacteristicCallbacks());
   pt2Characteristic->setCallbacks(new MyCharacteristicCallbacks2());
   ps1Characteristic->setCallbacks(new MyCharacteristicCallbacks3());
   ps2Characteristic->setCallbacks(new MyCharacteristicCallbacks4());
   cmdCharacteristic->setCallbacks(new MyCharacteristicCallbacksCMD());
-
+  TeamNameCharacteristic->setCallbacks(new MyCharacteristicCallbacksTeamNames());
   // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
   // Create a BLE Descriptor
   pSensorCharacteristic->addDescriptor(new BLE2902());
@@ -557,7 +622,7 @@ void setup(void) {
   ps1Characteristic->addDescriptor(new BLE2902());
   ps2Characteristic->addDescriptor(new BLE2902());
   cmdCharacteristic->addDescriptor(new BLE2902());
-
+  TeamNameCharacteristic->addDescriptor(new BLE2902());
   // Start the service
   pService->start();
 
@@ -585,13 +650,14 @@ void loop() {
     return;
   }
   if (NeedToNotifyTFT) {
+    Serial.println("need to notify tft");
     //in this case we only call this fct from BLE
     SetNewScore(mRadioScores[mCurrentRadioID].mT1, mRadioScores[mCurrentRadioID].mT2, mRadioScores[mCurrentRadioID].mS1, mRadioScores[mCurrentRadioID].mS2);
     NeedToNotifyTFT = false;
     //no return?
     //and multiple tasks allowed?
     //finally update Scoreboard
-    //SendMatchDataShortToScoreBoard(mCurrentRadioID);
+    
   }
   /*if(Serial.available()) 
     {
@@ -647,6 +713,7 @@ void loop() {
       SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets);
       NeedToNotifyBLE = true;
     }
+    NeedToNotifyLEDShort = true; //we may specify which matchdata
   } else if (packetSize == sizeof(RadioHistoryPacket)) {
 
     uint8_t t1_won = 0;
@@ -727,6 +794,12 @@ void loop() {
       oldDeviceConnected = deviceConnected;
       Serial.println("Device Connected");
     }
+  }
+  //maybe LED screen need update
+  if(NeedToNotifyLEDShort)
+  {
+    NeedToNotifyLEDShort = false;
+    SendMatchDataShortToScoreBoard(mCurrentRadioID);
   }
   return;
 }
