@@ -141,10 +141,7 @@ struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can b
 {
   uint8_t FromRadioId;
   uint8_t MatchNum; //we can track 3 matches
-  uint8_t T1_Score = 2;
-  uint8_t T2_Score = 3;
-  uint8_t T1_Sets = 1 ;
-  uint8_t T2_Sets = 2;
+  uint8_t type; //1-3 are current matchdata //4-6 are next match data
   char TeamName1[12] ;
   char TeamName2[12];
   uint32_t FailedTxCount;
@@ -223,7 +220,12 @@ uint8_t mCurrentRadioID = 0;
 ScoreBoard_over_Raio mRadioScores[3];
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
-char MatchNameData[12][45];
+//up to 15 games (30/2)
+char MatchNameData_Field1[12][30];
+int currentMatch_Field1= -1;
+int mValidTeamNamesField1 = 0;
+char MatchNameData_Field2[12][30];
+char MatchNameData_Field3[12][30];
 const uint16_t KC_red = 63488;
 const uint16_t KC_grey = 2113;
 const uint16_t KC_dirty_white = 61309;
@@ -237,6 +239,7 @@ const uint16_t KC_dark_blue = 53;
 #define S1_CHARACTERISTIC_UUID "19b10004-e8f2-537e-4f6c-d104768a1214"
 #define S2_CHARACTERISTIC_UUID "19b10005-e8f2-537e-4f6c-d104768a1214"
 #define CMD_CHARACTERISTIC_UUID "19b10005-e8f2-537e-4f6c-d104768a1215"
+//this is for field 1
 #define mTeamNameCharaceristic "19b10006-e8f2-537e-4f6c-d104768a1214"
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
@@ -406,12 +409,46 @@ class MyCharacteristicCallbacksCMD
 /*
 The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
 */
+
+void SetCurrentMatchField1(int mMatchNum)
+{
+  if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField1 /2))
+  {
+    Serial.println("SetCurrentMatchField1 invalid Matchnum");
+    return;
+  }
+  char T1[12];
+  char T2[12];
+  //copy data
+  for(size_t t=0; t <12; t++)
+  {
+    mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][mMatchNum*2];
+    mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][mMatchNum*2+1];
+  }
+  currentMatch_Field1 = mMatchNum;
+  //send data
+
+  mMatchDataLong.FromRadioId =0;
+  mMatchDataLong.MatchNum =currentMatch_Field1;
+  mMatchDataLong.type = 1;
+
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
+}
+
 class MyCharacteristicCallbacksTeamNames
   : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* TeamNameCharacteristic) {
     String value = TeamNameCharacteristic->getValue();
     if (value.length() > 0) {
-
+      //write everything into MatchNameData_Field1
+      int TeamnameNumber =0;
       //Serial.print("Team Names written: ");
       //Serial.println(value);  // Print the integer value
       Serial.println(TeamNameCharacteristic->getLength());
@@ -428,10 +465,12 @@ class MyCharacteristicCallbacksTeamNames
           for(size_t u = t-LastFinish ; u < 12;u++)
           {
             TeamName[u] = ' ';
+            MatchNameData_Field1[u][TeamnameNumber] = ' ';
           }
           TeamName[12] = '\0';
           Serial.print(TeamName);
           LastFinish =t+1;
+          TeamnameNumber++;
           continue;
         }
         else if (CurrentVal =='\n')
@@ -440,6 +479,8 @@ class MyCharacteristicCallbacksTeamNames
                     for(size_t u = t-LastFinish ; u < 12;u++)
                               {
             TeamName[u] = ' ';
+            MatchNameData_Field1[u][TeamnameNumber] = ' ';
+            TeamnameNumber++;
           }
           TeamName[12] = '\0';
           Serial.println(TeamName);
@@ -449,13 +490,32 @@ class MyCharacteristicCallbacksTeamNames
         }
         else 
         {
+          if(t-LastFinish > 11) //Limit of 12 chars
+          continue;
           TeamName[t-LastFinish] = value[t];
+          MatchNameData_Field1[t-LastFinish][TeamnameNumber] = value[t];
           
         }
       }
+      Serial.print("We have ");
+      Serial.print(TeamnameNumber);
+      Serial.print(" teams");
+      mValidTeamNamesField1 = TeamnameNumber;
+      if(currentMatch_Field1 ==-1)
+      {
+        currentMatch_Field1 = 0;
+      }
+      SetCurrentMatchField1(currentMatch_Field1);
     }
   }
 };
+
+//Need to connect matchdata with names
+
+
+/*int currentMatch_Field1= -1;
+int mValidTeamNamesField1 = 0;
+*/
 
 void UpdateScreenColor() {
   Serial.print("Update Screen Color ");
