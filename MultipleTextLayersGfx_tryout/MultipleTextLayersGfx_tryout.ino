@@ -25,15 +25,10 @@ struct __attribute__((packed)) Radio_Remote_Commandpackage  // Any packet up to 
 
 struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can be sent.
 {
-  uint8_t FromRadioId;
   uint8_t MatchNum; //we can track 3 matches
-  uint8_t T1_Score = 2;
-  uint8_t T2_Score = 3;
-  uint8_t T1_Sets = 1 ;
-  uint8_t T2_Sets = 2;
-  char TeamName1[12] ;
+  uint8_t type; //1-3 are current matchdata //4-6 are next match data
+  char TeamName1[12];
   char TeamName2[12];
-  uint32_t FailedTxCount;
 };
 
 struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can be sent.
@@ -342,6 +337,9 @@ matrix.addLayer(&sets_match2);
 bool NewRadioEvent()
 {
   uint8_t packetSize = _radio.hasData();
+  if(packetSize == 0)
+  return false;
+   Serial.println(packetSize);
   if (packetSize == sizeof(MatchDataLong))
   {
     Serial.println("Radio Msg Long recieved");
@@ -352,7 +350,7 @@ bool NewRadioEvent()
     Serial.println("Radio Msg short recieved");
      return RecievedMatchDataShort();
   }
-  //_radio.discardData(packetSize);
+  _radio.discardData(packetSize);
     return false;
 
 
@@ -362,34 +360,30 @@ bool NewRadioEvent()
 
 bool RecievedMatchDataLong()
 {
-      _radio.readData(&_radioCmdData);
-    uint8_t sender = _radioCmdData.FromRadioId;
-    if(sender != 0)
-    return false;
+      _radio.readData(&_radio_matchDataLong);
+    uint8_t matchtype = _radio_matchDataLong.type;
+    Serial.println(matchtype);
     Match* MyMatch = &mMatch1;
-    if(sender == 5)
+    if(matchtype == 2)
     {
       MyMatch = &mMatch2;
     }
-    else if (sender == 6)
+    else if (matchtype == 3)
     {
       MyMatch = &mMatch3;
+    }
+    else if(matchtype < 0)return true; //Handle 4-6
+    if(matchtype < 4)
+    {
+      //mRadioChangeEvent.BigDataChange = true;
+      ChangeTeamNames(matchtype);
     }
     return true;
 }
 
 bool RecievedMatchDataShort()
 {
-/*struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can be sent.
-{
-  uint8_t FromRadioId;
-  uint8_t MatchNum; //we can track 3 matches
-  uint8_t T1_Score = 2;
-  uint8_t T2_Score = 3;
-  uint8_t T1_Sets = 1 ;
-  uint8_t T2_Sets = 2;
-  uint32_t FailedTxCount;
-};*/
+
   _radio.readData(&_radio_matchDataShort);
       uint8_t sender = _radio_matchDataShort.FromRadioId;
     if(sender != 0)
@@ -425,9 +419,9 @@ void loop() {
   }
   else if (mRadioChangeEvent.BigDataChange)
   {
-    Serial.println("we recieved big data change");
-      PerformBigDataChange();
-      mRadioChangeEvent.BigDataChange = false;
+    //Serial.println("we recieved big data change");
+      //PerformBigDataChange();
+      //mRadioChangeEvent.BigDataChange = false;
   }
   delay(20);
 }
@@ -505,10 +499,14 @@ void PerformLittleDataChange()
         sets_match2.swapBuffers(false);
 }
 }
-void PerformBigDataChange()
+void ChangeTeamNames(int MatchNum)
 {
-  int y_Offset = mRadioChangeEvent.MatchNum-1 *32;
-  scrollingLayer03;
+    Serial.print("Change Team NAmes");
+  mRadioChangeEvent.MatchNum = MatchNum;
+  Serial.println("Matchnum ");
+  
+  int y_Offset = (MatchNum-1) *32;
+  Serial.println(y_Offset);
   SMLayerGFXMono<rgb24,rgb1,kIndexedLayerOptions>* MyLayerTeams= &scrollingLayer03;
   Match* MyMatch = &mMatch1;
   if(mRadioChangeEvent.MatchNum == 2)
@@ -516,52 +514,63 @@ void PerformBigDataChange()
     MyLayerTeams = &teams_match2;
     MyMatch = &mMatch2;
   }
+  MyLayerTeams->fillScreen(0);
         MyLayerTeams->setCursor(2, y_Offset+2);
+        Serial.print("Teamname 1 ");
         for(size_t t=0; t < 12; t++)
         {
-          char currentchar = MyMatch->Teamname1[t];
+          char currentchar = _radio_matchDataLong.TeamName1[t];
+          MyMatch->Teamname1[t] = currentchar;
+          Serial.print(currentchar);
           if(currentchar == 'ä')
           {
             MyLayerTeams->write(0x84);   // Print the u-with-umlauts
           }
           else if (currentchar == 'ö')
           {
-
+            MyLayerTeams->write(0x94);
           }
           else if (currentchar == 'ü')
           {
-
+            MyLayerTeams->write(0x81);
           }
           else
           {
             MyLayerTeams->print(currentchar);
           }
         }
+        Serial.println("");
         MyLayerTeams->setCursor(22, y_Offset+11);
         MyLayerTeams->println("vs.");
 
         MyLayerTeams->setCursor(2, y_Offset+22);
+        Serial.print("Teamname 2 ");
                 for(size_t t=0; t < 12; t++)
         {
-          char currentchar = MyMatch->Teamname2[t];
+          
+          char currentchar = _radio_matchDataLong.TeamName2[t];
+          MyMatch->Teamname2[t] = currentchar;
+          Serial.print(currentchar);
           if(currentchar == 'ä')
           {
             MyLayerTeams->write(0x84);   // Print the u-with-umlauts
           }
           else if (currentchar == 'ö')
           {
-
+            MyLayerTeams->write(0x94);
           }
           else if (currentchar == 'ü')
           {
-
+            MyLayerTeams->write(0x81);
           }
           else
           {
             MyLayerTeams->print(currentchar);
           }
         }
+        Serial.println("");
+        
+        MyLayerTeams->swapBuffers(false);
     //finally set scores
-    PerformLittleDataChange();
 }
 

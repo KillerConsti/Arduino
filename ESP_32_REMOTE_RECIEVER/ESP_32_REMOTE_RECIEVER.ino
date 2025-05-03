@@ -29,7 +29,7 @@
 #define TFT_ROT 0
 #include <BLEDevice.h>
 #include <BLEServer.h>
-#include <BLEUtils.h>
+//#include <BLEUtils.h>
 #include <BLE2902.h>
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -139,12 +139,10 @@ struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes ca
 //ScoreBoard
 struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can be sent.
 {
-  uint8_t FromRadioId;
   uint8_t MatchNum; //we can track 3 matches
   uint8_t type; //1-3 are current matchdata //4-6 are next match data
   char TeamName1[12] ;
   char TeamName2[12];
-  uint32_t FailedTxCount;
 };
 
 struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can be sent.
@@ -224,13 +222,11 @@ ScoreBoard_over_Raio mRadioScores[3];
 char MatchNameData_Field1[12][30];
 int currentMatch_Field1= -1;
 int mValidTeamNamesField1 = 0;
-char MatchNameData_Field2[12][30];
-char MatchNameData_Field3[12][30];
-const uint16_t KC_red = 63488;
+//char MatchNameData_Field2[12][30];
+//char MatchNameData_Field3[12][30];
 const uint16_t KC_grey = 2113;
 const uint16_t KC_dirty_white = 61309;
 const uint16_t KC_DARKGREY = 31727;
-const uint16_t KC_dark_blue = 53;
 
 #define SERVICE_UUID "19b10000-e8f2-537e-4f6c-d104768a1214"
 #define SENSOR_CHARACTERISTIC_UUID "19b10001-e8f2-537e-4f6c-d104768a1214"
@@ -412,13 +408,12 @@ The problem is Serial.print when you pass a char * argument, it expects the arra
 
 void SetCurrentMatchField1(int mMatchNum)
 {
+  Serial.println(mMatchNum);
   if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField1 /2))
   {
     Serial.println("SetCurrentMatchField1 invalid Matchnum");
     return;
   }
-  char T1[12];
-  char T2[12];
   //copy data
   for(size_t t=0; t <12; t++)
   {
@@ -428,11 +423,14 @@ void SetCurrentMatchField1(int mMatchNum)
   currentMatch_Field1 = mMatchNum;
   //send data
 
-  mMatchDataLong.FromRadioId =0;
-  mMatchDataLong.MatchNum =currentMatch_Field1;
+  mMatchDataLong.MatchNum =1;
   mMatchDataLong.type = 1;
-
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+  if(&mMatchDataLong == nullptr)
+  {
+    Serial.println("Matchdatalong is a nullpr");
+  }
+Serial.println("send stuff");
+    if(_radio.send(8, &mMatchDataLong, sizeof(MatchDataLong),NRFLite::NO_ACK))
   {
     Serial.println("...success");
   }
@@ -440,6 +438,7 @@ void SetCurrentMatchField1(int mMatchNum)
   {
     Serial.println("...fail");
   }
+  Serial.println("send stuff");
 }
 
 class MyCharacteristicCallbacksTeamNames
@@ -456,6 +455,7 @@ class MyCharacteristicCallbacksTeamNames
       int LastFinish = 0;
       for(size_t t= 0 ; t < TeamNameCharacteristic->getLength();t++)
       {
+        Serial.println(TeamnameNumber);
         //Serial.print(t);
         //Serial.print(" ");
         //Serial.println(value[t]);
@@ -468,7 +468,7 @@ class MyCharacteristicCallbacksTeamNames
             MatchNameData_Field1[u][TeamnameNumber] = ' ';
           }
           TeamName[12] = '\0';
-          Serial.print(TeamName);
+          Serial.println(TeamName);
           LastFinish =t+1;
           TeamnameNumber++;
           continue;
@@ -480,10 +480,11 @@ class MyCharacteristicCallbacksTeamNames
                               {
             TeamName[u] = ' ';
             MatchNameData_Field1[u][TeamnameNumber] = ' ';
-            TeamnameNumber++;
+            
           }
           TeamName[12] = '\0';
           Serial.println(TeamName);
+          TeamnameNumber++;
 
           LastFinish =t+1;
           continue;
@@ -505,7 +506,10 @@ class MyCharacteristicCallbacksTeamNames
       {
         currentMatch_Field1 = 0;
       }
+       Serial.print("Our current match is");
+      Serial.println(currentMatch_Field1);
       SetCurrentMatchField1(currentMatch_Field1);
+      Serial.print("setted matchdata field 1");
     }
   }
 };
@@ -577,12 +581,13 @@ void setup(void) {
     //while (1)
       ;  // Wait here forever.
   }*/
-  tft.begin();
-  if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+    if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
   }
+  tft.begin();
+
   mCurrentRadioID = 0;
   mRadioScores[0].BackgroundColor = 3697;
   mRadioScores[1].BackgroundColor = 61521;  //tft.color565(240,11,140);
@@ -695,6 +700,22 @@ void setup(void) {
   Serial.println("Waiting a client connection to notify...");
   _radioCmdData.CommandId = 0;
   _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
+
+  //test
+  mMatchDataLong.TeamName1[0] = 'H';
+  mMatchDataLong.TeamName1[1] = 'a';
+  mMatchDataLong.TeamName2[3] = 't';
+  mMatchDataLong.MatchNum =0;
+  mMatchDataLong.type = 1;
+  delay(1000);
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
 }
 
 void loop() {
