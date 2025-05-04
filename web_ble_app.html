@@ -70,14 +70,17 @@
                 <button id="off2Button" class="offButton">OFF</button>
 				</div>
             </div>
-			 <label for="w3review">Review of W3Schools:</label>
+			<div class="card">
+			 <h2>Set Team Names</h2>
 
 <textarea id="w3review" name="w3review" rows="4" cols="50">
 BeachfreundE:TeamE2
 EbersbrunN:VolleybäreN
-
 </textarea>
-<button id="SendNames" class="SendNames">SendTeamNames</button> 
+<button id="SendNames" class="onButton">SendTeamNames</button> 
+<input type="number" id="matchnum1" style ="max-width: 50px;" value="0" min="0" max="20">
+<button id="SendNumber1" class="onButton">Set Current Game #</button> 
+</div>
 						<div class="card">
 				 <button id="SoftReset" class="onButton">Soft Reset</button>
                 <button id="HardReset" class="offButton">Hard Reset</button>
@@ -110,7 +113,7 @@ EbersbrunN:VolleybäreN
 	
 	const SendTeamNames = document.getElementById('SendNames');
 	const Textfield = document.getElementById('w3review');
-	
+	const SendNumber1s = document.getElementById('SendNumber1');
 	
     const retrievedValue = document.getElementById('valueContainer');
     //const latestValueSent = document.getElementById('valueSent');
@@ -133,6 +136,7 @@ EbersbrunN:VolleybäreN
 	var mS2Characteristic= '19b10005-e8f2-537e-4f6c-d104768a1214';
 	var CMDCharacteristic= '19b10005-e8f2-537e-4f6c-d104768a1215';
 	var mTeamNameCharaceristic = '19b10006-e8f2-537e-4f6c-d104768a1214';
+	var mCurrentGameChar= '19b10007-e8f2-537e-4f6c-d104768a1214';
     //Global Variables to Handle Bluetooth
     var bleServer;
     var bleServiceFound;
@@ -160,6 +164,7 @@ EbersbrunN:VolleybäreN
 	buttonRadio2.addEventListener('click',() => SetRadio(2));
 	buttonRadio3.addEventListener('click',() => SetRadio(3));
 	SendTeamNames.addEventListener('click',() => SendTeamNames_func());
+	SendNumber1s.addEventListener('click',() => SendNumber1s_func());
 	function SetRadio(NewRadioID)
 	{
 		if(NewRadioID == mRadio)
@@ -197,7 +202,40 @@ EbersbrunN:VolleybäreN
 		}
 		
 	}
-	
+	function SendNumber1s_func()
+	{
+	if (bleServer && bleServer.connected) {
+		value = document.getElementById('matchnum1').value;
+		console.log("mCurrentGameChar");
+            bleServiceFound.getCharacteristic(mCurrentGameChar)
+            .then(characteristic => {
+                console.log("Found the T2 characteristic: ", characteristic.uuid);
+                const data = new Uint8Array([value]);
+                return characteristic.writeValue(data);
+            })
+            .then(() => {
+                //latestValueSent.innerHTML = value;
+                console.log("Value written to LEDcharacteristic:", value);
+            })
+            .catch(error => {
+                console.error("Error writing to the LED characteristic: ", error);
+            });
+        }
+		else {
+            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+        }
+    }
+    // Check if BLE is available in your Browser
+    function isWebBluetoothEnabled() {
+        if (!navigator.bluetooth) {
+            console.log('Web Bluetooth API is not available in this browser!');
+            bleStateContainer.innerHTML = "Web Bluetooth API is not available in this browser/device!";
+            return false
+        }
+        console.log('Web Bluetooth API supported in this browser.');
+        return true
+	}
 	function SendTeamNames_func()
 	{
         if (bleServer && bleServer.connected) {

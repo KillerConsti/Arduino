@@ -182,6 +182,7 @@ BLECharacteristic* ps1Characteristic = NULL;
 BLECharacteristic* ps2Characteristic = NULL;
 BLECharacteristic* cmdCharacteristic = NULL;
 BLECharacteristic* TeamNameCharacteristic = NULL;
+BLECharacteristic* TeamMathNumCharacteristics = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint32_t value = 0;
@@ -220,8 +221,8 @@ ScoreBoard_over_Raio mRadioScores[3];
 // https://www.uuidgenerator.net/
 //up to 15 games (30/2)
 char MatchNameData_Field1[12][30];
-int currentMatch_Field1= -1;
-int mValidTeamNamesField1 = 0;
+volatile int currentMatch_Field1= -1;
+int mValidTeamNamesField1 = 30;
 //char MatchNameData_Field2[12][30];
 //char MatchNameData_Field3[12][30];
 const uint16_t KC_grey = 2113;
@@ -237,6 +238,7 @@ const uint16_t KC_DARKGREY = 31727;
 #define CMD_CHARACTERISTIC_UUID "19b10005-e8f2-537e-4f6c-d104768a1215"
 //this is for field 1
 #define mTeamNameCharaceristic "19b10006-e8f2-537e-4f6c-d104768a1214"
+#define mTeamMatchNumCharaceristic "19b10007-e8f2-537e-4f6c-d104768a1214"
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
@@ -405,8 +407,10 @@ class MyCharacteristicCallbacksCMD
 /*
 The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
 */
-volatile bool NeedToSendMachData = false;
-
+volatile bool NeedToSendMachData_1_CurrentMatch = false;
+volatile bool NeedToSendMachData_1_NextMatch = false;
+volatile bool NeedToSendMachData_2_CurrentMatch = false;
+volatile bool NeedToSendMachData_2_NextMatch = false;
 void SetCurrentMatchField1(int mMatchNum)
 {
   //Serial.println(mMatchNum);
@@ -426,13 +430,13 @@ void SetCurrentMatchField1(int mMatchNum)
   currentMatch_Field1 = mMatchNum;
   //send data
 
-  mMatchDataLong.MatchNum =1;
+  mMatchDataLong.MatchNum =mMatchNum;
   mMatchDataLong.type = 1;
   Serial.println(mMatchDataLong.MatchNum);
   Serial.println(mMatchDataLong.type);
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
   {
     Serial.println("...success");
   }
@@ -442,6 +446,61 @@ void SetCurrentMatchField1(int mMatchNum)
   }
   Serial.println("send stuff");
 }
+
+void SetNextMatchField1(int mMatchNumCurrentMatch)
+{
+  //Serial.println(mMatchNum);
+  int NextMatchNum = mMatchNumCurrentMatch+1;
+  if(NextMatchNum < 0 || NextMatchNum > (mValidTeamNamesField1 /2))
+  {
+    Serial.println("SetNextMatchField1 invalid Matchnum");
+    return;
+  }
+  //copy data
+  for(size_t t=0; t <12; t++)
+  {
+    mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][NextMatchNum*2];
+    mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][NextMatchNum*2+1];
+  }
+  //mMatchDataLong.TeamName1[11] = '\0';
+  //mMatchDataLong.TeamName2[11] = '\0';
+  currentMatch_Field1 = mMatchNumCurrentMatch;
+  //send data
+
+  mMatchDataLong.MatchNum =NextMatchNum;
+  mMatchDataLong.type = 4;
+  //Serial.println(mMatchDataLong.TeamName1);
+  //Serial.println(mMatchDataLong.TeamName2);
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
+  Serial.println("send stuff");
+}
+class MyCharacteristicCallbacksTeamMatch1
+ : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* TeamMathNumCharacteristics) {
+    String value = TeamMathNumCharacteristics->getValue();
+    int mreceivedValue = 0;
+    if (value.length() > 0) {
+     mreceivedValue = static_cast<int>(value[0]);
+      if(value.length() == 2)
+      {
+        mreceivedValue = mreceivedValue*10;
+      mreceivedValue +=static_cast<int>(value[1]);
+      }
+        Serial.print("recieved  new current match 1 value");
+      Serial.println(mreceivedValue);
+      currentMatch_Field1 = mreceivedValue;
+      NeedToSendMachData_1_CurrentMatch = true;
+       NeedToSendMachData_1_NextMatch =true;
+    }
+  }
+ };
 
 class MyCharacteristicCallbacksTeamNames
   : public BLECharacteristicCallbacks {
@@ -509,7 +568,8 @@ class MyCharacteristicCallbacksTeamNames
       }
        Serial.print("Our current match is");
       Serial.println(currentMatch_Field1);
-       NeedToSendMachData = true;
+       NeedToSendMachData_1_CurrentMatch = true;
+       NeedToSendMachData_1_NextMatch =true;
 
       //SetCurrentMatchField1(currentMatch_Field1);
       Serial.print("setted matchdata field 1");
@@ -675,6 +735,7 @@ void setup(void) {
   ps2Characteristic = pService->createCharacteristic(S2_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
   cmdCharacteristic = pService->createCharacteristic(CMD_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
   TeamNameCharacteristic = pService->createCharacteristic(mTeamNameCharaceristic,BLECharacteristic::PROPERTY_WRITE);
+  TeamMathNumCharacteristics = pService->createCharacteristic(mTeamMatchNumCharaceristic,BLECharacteristic::PROPERTY_WRITE);
   // Register the callback for the ON button characteristic
   pt1Characteristic->setCallbacks(new MyCharacteristicCallbacks());
   pt2Characteristic->setCallbacks(new MyCharacteristicCallbacks2());
@@ -682,6 +743,7 @@ void setup(void) {
   ps2Characteristic->setCallbacks(new MyCharacteristicCallbacks4());
   cmdCharacteristic->setCallbacks(new MyCharacteristicCallbacksCMD());
   TeamNameCharacteristic->setCallbacks(new MyCharacteristicCallbacksTeamNames());
+  TeamMathNumCharacteristics->setCallbacks(new MyCharacteristicCallbacksTeamMatch1());
   // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
   // Create a BLE Descriptor
   pSensorCharacteristic->addDescriptor(new BLE2902());
@@ -691,6 +753,7 @@ void setup(void) {
   ps2Characteristic->addDescriptor(new BLE2902());
   cmdCharacteristic->addDescriptor(new BLE2902());
   TeamNameCharacteristic->addDescriptor(new BLE2902());
+  TeamMathNumCharacteristics->addDescriptor(new BLE2902());
   // Start the service
   pService->start();
 
@@ -708,10 +771,16 @@ void setup(void) {
 }
 
 void loop() {
-  if(NeedToSendMachData)
+  if(NeedToSendMachData_1_CurrentMatch)
   {
-    NeedToSendMachData = false;
+    NeedToSendMachData_1_CurrentMatch = false;
     SetCurrentMatchField1(currentMatch_Field1);
+    return;
+  }
+  if(NeedToSendMachData_1_NextMatch)
+  {
+    NeedToSendMachData_1_NextMatch = false;
+    SetNextMatchField1(currentMatch_Field1);
     return;
   }
   CheckInputState();
