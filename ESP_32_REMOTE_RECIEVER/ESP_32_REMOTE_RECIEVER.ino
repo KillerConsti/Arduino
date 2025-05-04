@@ -141,7 +141,7 @@ struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can b
 {
   uint8_t MatchNum; //we can track 3 matches
   uint8_t type; //1-3 are current matchdata //4-6 are next match data
-  char TeamName1[12] ;
+  char TeamName1[12];
   char TeamName2[12];
 };
 
@@ -405,10 +405,11 @@ class MyCharacteristicCallbacksCMD
 /*
 The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
 */
+volatile bool NeedToSendMachData = false;
 
 void SetCurrentMatchField1(int mMatchNum)
 {
-  Serial.println(mMatchNum);
+  //Serial.println(mMatchNum);
   if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField1 /2))
   {
     Serial.println("SetCurrentMatchField1 invalid Matchnum");
@@ -420,17 +421,18 @@ void SetCurrentMatchField1(int mMatchNum)
     mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][mMatchNum*2];
     mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][mMatchNum*2+1];
   }
+  //mMatchDataLong.TeamName1[11] = '\0';
+  //mMatchDataLong.TeamName2[11] = '\0';
   currentMatch_Field1 = mMatchNum;
   //send data
 
   mMatchDataLong.MatchNum =1;
   mMatchDataLong.type = 1;
-  if(&mMatchDataLong == nullptr)
-  {
-    Serial.println("Matchdatalong is a nullpr");
-  }
-Serial.println("send stuff");
-    if(_radio.send(8, &mMatchDataLong, sizeof(MatchDataLong),NRFLite::NO_ACK))
+  Serial.println(mMatchDataLong.MatchNum);
+  Serial.println(mMatchDataLong.type);
+  //Serial.println(mMatchDataLong.TeamName1);
+  //Serial.println(mMatchDataLong.TeamName2);
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
   {
     Serial.println("...success");
   }
@@ -455,7 +457,6 @@ class MyCharacteristicCallbacksTeamNames
       int LastFinish = 0;
       for(size_t t= 0 ; t < TeamNameCharacteristic->getLength();t++)
       {
-        Serial.println(TeamnameNumber);
         //Serial.print(t);
         //Serial.print(" ");
         //Serial.println(value[t]);
@@ -508,7 +509,9 @@ class MyCharacteristicCallbacksTeamNames
       }
        Serial.print("Our current match is");
       Serial.println(currentMatch_Field1);
-      SetCurrentMatchField1(currentMatch_Field1);
+       NeedToSendMachData = true;
+
+      //SetCurrentMatchField1(currentMatch_Field1);
       Serial.print("setted matchdata field 1");
     }
   }
@@ -702,24 +705,15 @@ void setup(void) {
   _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
 
   //test
-  mMatchDataLong.TeamName1[0] = 'H';
-  mMatchDataLong.TeamName1[1] = 'a';
-  mMatchDataLong.TeamName2[3] = 't';
-  mMatchDataLong.MatchNum =0;
-  mMatchDataLong.type = 1;
-  delay(1000);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
-  {
-    Serial.println("...success");
-  }
-  else
-  {
-    Serial.println("...fail");
-  }
 }
 
 void loop() {
-  
+  if(NeedToSendMachData)
+  {
+    NeedToSendMachData = false;
+    SetCurrentMatchField1(currentMatch_Field1);
+    return;
+  }
   CheckInputState();
   if (mUpdateScreenColor) {
     UpdateScreenColor();
