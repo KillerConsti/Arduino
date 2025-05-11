@@ -2,6 +2,7 @@
 
 //tft in user_setup.h
 #pragma once
+
 const static uint8_t RADIO_ID = 0;
 const static uint8_t PIN_RADIO_CE = 26;
 const static uint8_t PIN_RADIO_CSN = 27;
@@ -36,11 +37,17 @@ struct Drehschalter
 /*shared betweend classes*/
 
 bool NeedToNotifyBLE = false;
-bool NeedToNotifyTFT = false;
-bool NeedToNotifyRadio = false;
+bool NeedToNotifyTFT1 = false;
+bool NeedToNotifyTFT2 = false;
+bool NeedToNotifyRadio1 = false;
+bool NeedToNotifyRadio2 = false;
 bool mUpdateScreenColor = false;
-//bool is stupid here
-bool NeedToNotifyLEDShort;
+bool NeedToNotifyLEDShort1 = false;
+bool NeedToNotifyLEDShort2 = false;
+bool NeedToNotifyLEDCurrentMatchData1 = false;
+bool NeedToNotifyLEDCurrentMatchData2 = false;
+int LEDScreenMode =0;
+bool NeedToUpdateScreenMode = false;
 
 //Radio
 

@@ -12,9 +12,12 @@
     const static uint8_t USI_DO  = 1; // PB1
     const static uint8_t USI_SCK = 2; // PB2
 #else
+	#ifdef ESP32
+		#define HSPI_ESP
+		#endif
 	#ifdef CORE_TEENSY
 			#define RADIO_SPI_MODE1
-			#include <C:\Users\49151\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.59.0\libraries\SPI\SPI.h>
+			#include "SPI.h"
 			#warning("Teensy found <-> use SPI 1") // Teensy 4 //
 	#else
 		#warning("didnt find teensy") // Teensy 4 //
@@ -50,7 +53,10 @@ uint8_t NRFLite::init(uint8_t radioId, uint8_t cePin, uint8_t csnPin, Bitrates b
             // Arduino SPI makes SS (D10 on ATmega328) an output and sets it HIGH.  It must remain an output
             // for Master SPI operation, but in case it started as LOW, we'll set it back.
             uint8_t savedSS = digitalRead(SS);
-			#ifdef RADIO_SPI_MODE1
+			#ifdef HSPI_ESP
+			SPI1 = *new SPIClass(HSPI);
+			#endif 
+			#if defined(RADIO_SPI_MODE1) || defined(HSPI_ESP)
 			
             SPI1.begin();
 			#else
@@ -63,6 +69,8 @@ uint8_t NRFLite::init(uint8_t radioId, uint8_t cePin, uint8_t csnPin, Bitrates b
 	
 	#ifdef RADIO_SPI_MODE1
 		Serial.println("Use SPI 1");
+	#elif defined (HSPI_ESP)
+		Serial.println("Use ESP HSPI");
 	#else
 		Serial.println("Use SPI 0");
 	#endif
@@ -598,7 +606,7 @@ void NRFLite::spiTransfer(SpiTransferType transferType, uint8_t regName, void *d
             }
         #else
             // Transfer with the Arduino SPI library.
-		#ifdef RADIO_SPI_MODE1
+		#if defined(RADIO_SPI_MODE1) || defined(HSPI_ESP)
             SPI1.beginTransaction(SPISettings(NRF_SPICLOCK, MSBFIRST, SPI_MODE0));
 			SPI1.transfer(regName);
 			 for (uint8_t i = 0; i < length; ++i) {

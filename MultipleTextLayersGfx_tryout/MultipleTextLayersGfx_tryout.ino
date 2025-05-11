@@ -14,11 +14,13 @@
 //2 structs
 
 //1. What we send
-struct __attribute__((packed)) Radio_Remote_Commandpackage  // Any packet up to 32 bytes can be sent.
+struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can be sent.
 {
-  uint8_t FromRadioId;
   uint8_t CommandId = 0;
   uint8_t CommandArg1 = 0;
+  uint8_t CommandArg2 = 0;
+  uint8_t CommandArg3 = 0;
+  uint8_t CommandArg4 = 0;
 };
 
 
@@ -46,7 +48,7 @@ struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can 
 
 #include "NRFLite.h"
 NRFLite _radio;
-Radio_Remote_Commandpackage _radioCmdData;
+Commandpackage _radioCmdData;
 MatchDataLong _radio_matchDataLong;
 MatchDataShort _radio_matchDataShort;
 struct RadioChangeEvent
@@ -226,7 +228,7 @@ void fillnoise8() {
 
 void setup() {
   Serial.begin(115200);
-
+  Serial.print(static_cast<uint8_t>('ä'));
   delay(500);
 
   randomSeed(analogRead(0));
@@ -334,30 +336,6 @@ matrix.addLayer(&sets_match2);
 }
 }
 
-bool NewRadioEvent()
-{
-  uint8_t packetSize = _radio.hasData();
-  if(packetSize == 0)
-  return false;
-   Serial.println(packetSize);
-  if (packetSize == sizeof(MatchDataLong))
-  {
-    Serial.println("Radio Msg Long recieved");
-     return RecievedMatchDataLong();
-  }
-  else if (packetSize == sizeof(MatchDataShort))
-  {
-    Serial.println("Radio Msg short recieved");
-     return RecievedMatchDataShort();
-  }
-  _radio.discardData(packetSize);
-    return false;
-
-
-
-    
-}
-
 bool RecievedMatchDataLong()
 {
       _radio.readData(&_radio_matchDataLong);
@@ -380,6 +358,60 @@ bool RecievedMatchDataLong()
     }
     return true;
 }
+
+bool NewRadioEvent()
+{
+  uint8_t packetSize = _radio.hasData();
+  if(packetSize == 0)
+  return false;
+   Serial.println(packetSize);
+  if (packetSize == sizeof(MatchDataLong))
+  {
+    Serial.println("Radio Msg Long recieved");
+     return RecievedMatchDataLong();
+  }
+  else if (packetSize == sizeof(MatchDataShort))
+  {
+    Serial.println("Radio Msg short recieved");
+     return RecievedMatchDataShort();
+  }
+  else if (packetSize == sizeof(_radioCmdData))
+  {
+    return HandleCMDData();
+  }
+  _radio.discardData(packetSize);
+    return false; 
+}
+
+bool HandleCMDData()
+{
+      _radio.readData(&_radioCmdData);
+    uint8_t id = _radioCmdData.CommandId;
+    uint8_t arg = _radioCmdData.CommandArg1;
+    if(id != 0)
+    return false;
+    switch (arg)
+    {
+      case 0: //Beachfreunde Scrren
+      {
+        Serial.print("Show Beachfreunde screen");
+        return true;
+      }
+      case 1:
+      {
+        Serial.print("Show Scores");
+        return true;
+      }
+      default:
+      {
+        Serial.print("Toggle between screens");
+        return true; 
+      }
+    }
+
+}
+
+
 
 bool RecievedMatchDataShort()
 {
@@ -522,6 +554,7 @@ void ChangeTeamNames(int MatchNum)
           char currentchar = _radio_matchDataLong.TeamName1[t];
           MyMatch->Teamname1[t] = currentchar;
           Serial.print(currentchar);
+          Serial.println(static_cast<uint8_t>(currentchar));
           if(currentchar == 'ä')
           {
             MyLayerTeams->write(0x84);   // Print the u-with-umlauts

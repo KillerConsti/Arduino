@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef _NRFLite_h_
 #define _NRFLite_h_
 
@@ -7,11 +9,13 @@
 #ifndef _BV
 #define _BV(bit) (1 << (bit))
 #endif
-
+#include "SPI.h"
 class NRFLite {
 
   public:
-    
+    #ifdef ESP32
+	SPIClass SPI1;
+	#endif
     // Constructors
     // Optionally pass in an Arduino Serial or SoftwareSerial object for use throughout the library when debugging.
     // Use the debug and debugln DEFINES in NRFLite.cpp to use the serial object.

@@ -56,9 +56,17 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks {
             } else {
                 digitalWrite(ledPin, LOW);
             }*/
-      NeedToNotifyRadio = true;
+            if(mCurrentRadioID == 0)
+            {
+              NeedToNotifyTFT1 = true;
+              NeedToNotifyRadio1 = true;
+            }
+             else /*if(mCurrentRadioID == 1)*/
+            {
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+            }
       NeedToNotifyBLE = true;
-      NeedToNotifyTFT = true;
     }
   }
 };
@@ -72,9 +80,17 @@ class MyCharacteristicCallbacks2 : public BLECharacteristicCallbacks {
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
       mRadioScores[mCurrentRadioID].mT2 = constrain(receivedValue, 0, 99);
-      NeedToNotifyTFT = true;
+                  if(mCurrentRadioID == 0)
+            {
+              NeedToNotifyTFT1 = true;
+              NeedToNotifyRadio1 = true;
+            }
+            else /*if(mCurrentRadioID == 1)*/
+            {
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+            }
       NeedToNotifyBLE = true;
-      NeedToNotifyRadio = true;
       /*if (receivedValue == 1) {
                 digitalWrite(ledPin, HIGH);
             } else {
@@ -93,14 +109,17 @@ class MyCharacteristicCallbacks3 : public BLECharacteristicCallbacks {
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
       mRadioScores[mCurrentRadioID].mS1 = constrain(receivedValue, 0, 3);
-      NeedToNotifyTFT = true;
+                  if(mCurrentRadioID == 0)
+            {
+              NeedToNotifyTFT1 = true;
+              NeedToNotifyRadio1 = true;
+            }
+            else /*if(mCurrentRadioID == 1)*/
+            {
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+            }
       NeedToNotifyBLE = true;
-      NeedToNotifyRadio = true;
-      /*if (receivedValue == 1) {
-                digitalWrite(ledPin, HIGH);
-            } else {
-                digitalWrite(ledPin, LOW);
-            }*/
     }
   }
 };
@@ -114,14 +133,17 @@ class MyCharacteristicCallbacks4 : public BLECharacteristicCallbacks {
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
       mRadioScores[mCurrentRadioID].mS2 = constrain(receivedValue, 0, 3);
-      NeedToNotifyTFT = true;
+                  if(mCurrentRadioID == 0)
+            {
+              NeedToNotifyTFT1 = true;
+              NeedToNotifyRadio1 = true;
+            }
+             else /*if(mCurrentRadioID == 1)*/
+            {
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+            }
       NeedToNotifyBLE = true;
-      NeedToNotifyRadio = true;
-      /*if (receivedValue == 1) {
-                digitalWrite(ledPin, HIGH);
-            } else {
-                digitalWrite(ledPin, LOW);
-            }*/
     }
   }
 };
@@ -199,6 +221,8 @@ class LEDScrrenModeCallback : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* LEDScrrenModeCharaceristic) {
   String value = LEDScrrenModeCharaceristic->getValue();
   Serial.println(static_cast<int>(value[0]));
+  LEDScreenMode = static_cast<int>(value[0]);
+  NeedToUpdateScreenMode = true;
   }
   };
 

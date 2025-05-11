@@ -26,31 +26,14 @@
 
 // This sketch uses font files created from the Noto family of fonts:
 // https://www.google.com/get/noto/
-
 #include <Globals.h>
 #include <FoxAndVolleyball.h>
 #include <BLEInterface.h>
-
+#include <display.h>
+MyDisplay* mDisplay;
 
 BLEInterface mBLEInterface;
-#define TFT_ROT 0
-#include "NotoSansBold15.h"
-#include "NotoSansBold36.h"
-//#include "NotoSansMonoSCB20.h"
 #include <pgmspace.h>
-// The font names are arrays references, thus must NOT be in quotes ""
-#define AA_FONT_SMALL NotoSansBold15
-#define AA_FONT_LARGE NotoSansBold36
-//#define AA_FONT_MONO NotoSansMonoSCB20  // NotoSansMono-SemiCondensedBold 20pt
-#include <SPI.h>
-#include <TFT_eSPI.h>  // Hardware-specific library
-TFT_eSPI tft = TFT_eSPI();
-TFT_eSprite spr = TFT_eSprite(&tft);  // Sprite class needs to be invoked
-
-const uint8_t xpos_volleyball = 15;
-const uint8_t ypos_volleyball = 115;
-const uint8_t xpos_fox = 170;
-const uint8_t ypos_fox = 115;
 
 
 Drehschalter mDrehschalter;
@@ -90,9 +73,6 @@ MatchDataLong mMatchDataLong;
 
 //char MatchNameData_Field2[12][30];
 //char MatchNameData_Field3[12][30];
-const uint16_t KC_grey = 2113;
-const uint16_t KC_dirty_white = 61309;
-const uint16_t KC_DARKGREY = 31727;
 
 
 
@@ -122,6 +102,9 @@ void SetCurrentMatchField1(int mMatchNum)
   //copy data
   for(size_t t=0; t <12; t++)
   {
+    Serial.print(MatchNameData_Field1[t][mMatchNum*2]);
+    Serial.print(" ");
+    Serial.println(static_cast<uint8_t>(MatchNameData_Field1[t][mMatchNum*2]));
     mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][mMatchNum*2];
     mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][mMatchNum*2+1];
   }
@@ -136,7 +119,7 @@ void SetCurrentMatchField1(int mMatchNum)
   Serial.println(mMatchDataLong.type);
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
   {
     Serial.println("...success");
   }
@@ -171,7 +154,78 @@ void SetNextMatchField1(int mMatchNumCurrentMatch)
   mMatchDataLong.type = 4;
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
+  Serial.println("send stuff");
+}
+
+void SetCurrentMatchField2(int mMatchNum)
+{
+  //Serial.println(mMatchNum);
+  if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField2 /2))
+  {
+    Serial.println("SetCurrentMatchField2 invalid Matchnum");
+    return;
+  }
+  //copy data
+  for(size_t t=0; t <12; t++)
+  {
+    mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][mMatchNum*2];
+    mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][mMatchNum*2+1];
+  }
+  //mMatchDataLong.TeamName1[11] = '\0';
+  //mMatchDataLong.TeamName2[11] = '\0';
+  currentMatch_Field2 = mMatchNum;
+  //send data
+
+  mMatchDataLong.MatchNum =mMatchNum;
+  mMatchDataLong.type = 2;
+  Serial.println(mMatchDataLong.MatchNum);
+  Serial.println(mMatchDataLong.type);
+  //Serial.println(mMatchDataLong.TeamName1);
+  //Serial.println(mMatchDataLong.TeamName2);
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
+  Serial.println("send stuff");
+}
+
+void SetNextMatchField2(int mMatchNumCurrentMatch)
+{
+  //Serial.println(mMatchNum);
+  int NextMatchNum = mMatchNumCurrentMatch+1;
+  if(NextMatchNum < 0 || NextMatchNum > (mValidTeamNamesField2 /2))
+  {
+    Serial.println("SetNextMatchField2 invalid Matchnum");
+    return;
+  }
+  //copy data
+  for(size_t t=0; t <12; t++)
+  {
+    mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][NextMatchNum*2];
+    mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][NextMatchNum*2+1];
+  }
+  //mMatchDataLong.TeamName1[11] = '\0';
+  //mMatchDataLong.TeamName2[11] = '\0';
+  currentMatch_Field2 = mMatchNumCurrentMatch;
+  //send data
+
+  mMatchDataLong.MatchNum =NextMatchNum;
+  mMatchDataLong.type = 5;
+  //Serial.println(mMatchDataLong.TeamName1);
+  //Serial.println(mMatchDataLong.TeamName2);
+    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
   {
     Serial.println("...success");
   }
@@ -191,24 +245,7 @@ int mValidTeamNamesField1 = 0;
 */
 
 void UpdateScreenColor() {
-  Serial.print("Update Screen Color ");
-  Serial.println(mCurrentRadioID);
-  mUpdateScreenColor = true;
-  //Clear screen - as we change radio id
-  tft.fillCircle(60, 90, 25, mRadioScores[mCurrentRadioID].BackgroundColor);
-  tft.fillCircle(180, 90, 25, mRadioScores[mCurrentRadioID].BackgroundColor);
-  //tft.drawRect(60, 85, 100, 30, TFT_RED);
-  tft.fillRect(60, 65, 120, 51, mRadioScores[mCurrentRadioID].BackgroundColor);
-  //tft.fillRect(60, 10, 30, 51, TFT_YELLOW);
-   spr.createSprite(80, 40);
-  spr.fillSprite(KC_grey);
-  spr.pushSprite(80, 20);  // Push to TFT screen coord 10, 10
-  //Middle in green
-  spr.deleteSprite();
-  spr.createSprite(90, 97);
-  spr.fillSprite(KC_dirty_white);
-  spr.pushSprite(75, 121);
-  spr.deleteSprite();
+  mDisplay->UpdateScreenColor();
 }
 
 void SendMatchDataLongToScoreBoard(int MatchNum)
@@ -226,7 +263,7 @@ void SendMatchDataShortToScoreBoard(int MatchNum)
   mMatchDataShort.MatchNum =MatchNum+1;
   Serial.print("send data short to LED board ");
   
-  if(_radio.send(8, &mMatchDataShort, sizeof(mMatchDataShort)))
+  if(_radio.send(8, &mMatchDataShort, sizeof(mMatchDataShort),NRFLite::NO_ACK))
   {
     Serial.println("...success");
   }
@@ -239,98 +276,63 @@ void SendMatchDataShortToScoreBoard(int MatchNum)
 
 
 void setup(void) {
-  Serial.begin(9600);
+  Serial.begin(9600 );
   //attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
   pinMode(mDrehschalter._CLK,INPUT);
   pinMode(mDrehschalter._DT,INPUT);
   pinMode(mDrehschalter._SW,INPUT);
-  
-      /*if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
-    Serial.println("Cannot communicate with radio");
-    //while (1)
-      ;  // Wait here forever.
-  }*/
-    if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+    mDisplay = new MyDisplay();
+  mRadioScores[0].BackgroundColor = 3697;
+  mRadioScores[1].BackgroundColor = 61521;  //tft.color565(240,11,140);
+  mRadioScores[2].BackgroundColor = 2142;   //tft.color565(11,11,240);
+    mCurrentRadioID = 0; //shall be removed
+           mDisplay->initDevice();
+        digitalWrite(22,HIGH);
+        delay(1000);
+        
+        /*
+        #define HSPI_SCK 14 
+#define HSPI_MISO 12
+#define HSPI_MOSI 13 
+#define HSPI_CS 15 
+*/
+        if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
   }
-  tft.begin();
-
-  mCurrentRadioID = 0;
-  mRadioScores[0].BackgroundColor = 3697;
-  mRadioScores[1].BackgroundColor = 61521;  //tft.color565(240,11,140);
-  mRadioScores[2].BackgroundColor = 2142;   //tft.color565(11,11,240);
-  //Serial.println(tft.color565(240,11,140));
-  //Serial.println(tft.color565(11,11,240));
-  //SPI.begin(PIN_RADIO_SCK, PIN_RADIO_MISO, PIN_RADIO_MOSI, PIN_RADIO_CSN);
-
-  // Indicate to NRFLite that it should not call SPI.begin() during initialization since it has already been done.
+  
+ 
+ 
+  delay(1000);
 
 
   attachInterrupt(digitalPinToInterrupt(mDrehschalter._CLK), DrehschalterDreh1, CHANGE);
-  tft.setRotation(TFT_ROT);
 
-  spr.setColorDepth(16);  // 16 bit colour needed to show antialiased fonts
-
-  tft.fillScreen(KC_grey);
-  //tft.fillRect(0, 90, 240, 240, dirty_white);
-  tft.fillCircle(60, 180, 90, KC_DARKGREY);
-  tft.fillCircle(180, 180, 90, KC_DARKGREY);
-
-
-  tft.fillCircle(60, 180, 88, KC_dirty_white);
-  tft.fillCircle(180, 180, 88, KC_dirty_white);
-
-  tft.fillRect(60, 90, 120, 240, KC_dirty_white);
-
-  //tft.drawLine(50, 115, 0, 240, TFT_DARKGREY);
-  //tft.drawLine(190, 115, 240, 240, TFT_DARKGREY);
-  DrawVolleyball();
-  DrawFox();
-  //tft.drawCircle(120, 120, 120, TFT_DARKGREY);
-  //tft.drawCircle(120, 120, 119, TFT_DARKGREY);
-  tft.drawArc(120, 120, 120, 119, 270, 90, KC_DARKGREY, KC_DARKGREY);
-  /*uint16_t bluish = tft.color565(11,206,140);
-  Serial.println("redish");
-  Serial.println(tft.color565(206,11,140));
-    Serial.println("yellowish");
-  Serial.println(tft.color565(206,140,11));*/
-  /* start here*/
-  //border
-  tft.fillCircle(60, 90, 27, KC_DARKGREY);
-  tft.fillCircle(180, 90, 27, KC_DARKGREY);
-  tft.fillRect(60, 63, 120, 55, KC_DARKGREY);
-  //real obj
-
-
-  tft.fillCircle(60, 90, 25, mRadioScores[0].BackgroundColor);
-  tft.fillCircle(180, 90, 25, mRadioScores[0].BackgroundColor);
-  //tft.drawRect(60, 85, 100, 30, TFT_RED);
-  tft.fillRect(60, 65, 120, 51, mRadioScores[0].BackgroundColor);
-
-  //debug lines
-  /*tft.drawLine(120, 0, 120, 240, TFT_RED);
-  tft.drawLine(0, 120, 240, 120, TFT_RED);
-    tft.drawLine(140, 0, 140, 240, TFT_RED);
-      tft.drawLine(100, 0, 100, 240, TFT_RED);*/
-
-  //request an radio update
-  //have to do it after tft is setup... else we fail with listening
-
-
-  /* BLE */
-  // Create the BLE Device
   mBLEInterface = *new BLEInterface();
   mBLEInterface.initDevice();
   Serial.println("Waiting a client connection to notify...");
   _radioCmdData.CommandId = 0;
-  _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
-
-  //test
+  if(_radio.send(1, &_radioCmdData, sizeof(_radioCmdData)))
+  {
+    Serial.println("radio msg 1 was sent succesfully");
+  }
+    if(_radio.send(2, &_radioCmdData, sizeof(_radioCmdData)))
+  {
+    Serial.println("radio msg 2 was sent succesfully");
+  }
 }
 
 void loop() {
+  if(NeedToUpdateScreenMode)
+  {
+      _radioCmdData.CommandId = 0;
+      _radioCmdData.CommandArg1 =LEDScreenMode;
+  if(_radio.send(8, &_radioCmdData, sizeof(_radioCmdData),NRFLite::NO_ACK))
+    Serial.println("radio msg 1 was sent succesfully");
+    NeedToUpdateScreenMode = false;
+    return;
+  }
   if(NeedToSendMachData_1_CurrentMatch)
   {
     NeedToSendMachData_1_CurrentMatch = false;
@@ -343,6 +345,18 @@ void loop() {
     SetNextMatchField1(currentMatch_Field1);
     return;
   }
+    if(NeedToSendMachData_2_CurrentMatch)
+  {
+    NeedToSendMachData_2_CurrentMatch = false;
+    SetCurrentMatchField2(currentMatch_Field2);
+    return;
+  }
+  if(NeedToSendMachData_2_NextMatch)
+  {
+    NeedToSendMachData_2_NextMatch = false;
+    SetNextMatchField2(currentMatch_Field2);
+    return;
+  }
   CheckInputState();
   if (mUpdateScreenColor) {
     UpdateScreenColor();
@@ -353,35 +367,43 @@ void loop() {
     Serial.println("we sent cmd to radio");
     return;
   }
-  if (NeedToNotifyTFT) {
+  if (NeedToNotifyTFT1) {
     Serial.println("need to notify tft");
     //in this case we only call this fct from BLE
-    SetNewScore(mRadioScores[mCurrentRadioID].mT1, mRadioScores[mCurrentRadioID].mT2, mRadioScores[mCurrentRadioID].mS1, mRadioScores[mCurrentRadioID].mS2);
-    NeedToNotifyTFT = false;
-    //no return?
-    //and multiple tasks allowed?
-    //finally update Scoreboard
+    SetNewScore(mRadioScores[0].mT1, mRadioScores[0].mT2, mRadioScores[0].mS1, mRadioScores[0].mS2,1);
+    NeedToNotifyTFT1 = false;
     
   }
-  /*if(Serial.available()) 
-    {
-  // TODO
-    Serial.read();
-    _radio.send(DESTINATION_RADIO_ID, &_radioCmdData, sizeof(_radioCmdData));
-    
-    Serial.println("serial av");
-    }*/
-  if (NeedToNotifyRadio) {
-    Serial.println("Inform Radio now");
+  else if(NeedToNotifyTFT2) 
+  {
+    Serial.println("need to notify tft 2");
+    //in this case we only call this fct from BLE
+    SetNewScore(mRadioScores[1].mT1, mRadioScores[1].mT2, mRadioScores[1].mS1, mRadioScores[1].mS2,2);
+    NeedToNotifyTFT2 = false;
+  }
+  if (NeedToNotifyRadio1) {
+    Serial.println("Inform Radio 1 now");
     _radioCmdData.CommandId = 1;
-    _radioCmdData.CommandArg1 = mRadioScores[mCurrentRadioID].mT1;
-    _radioCmdData.CommandArg2 = mRadioScores[mCurrentRadioID].mT2;
-    _radioCmdData.CommandArg3 = mRadioScores[mCurrentRadioID].mS1;
-    _radioCmdData.CommandArg4 = mRadioScores[mCurrentRadioID].mS2;
-    _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
-    NeedToNotifyRadio = false;
+    _radioCmdData.CommandArg1 = mRadioScores[0].mT1;
+    _radioCmdData.CommandArg2 = mRadioScores[0].mT2;
+    _radioCmdData.CommandArg3 = mRadioScores[0].mS1;
+    _radioCmdData.CommandArg4 = mRadioScores[0].mS2;
+    _radio.send(1, &_radioCmdData, sizeof(_radioCmdData));
+    NeedToNotifyRadio1 = false;
 
-  } else if (CommandMode.MessageRecieved) {
+  }
+  else   if (NeedToNotifyRadio2) {
+    Serial.println("Inform Radio 2 now");
+    _radioCmdData.CommandId = 1;
+    _radioCmdData.CommandArg1 = mRadioScores[1].mT1;
+    _radioCmdData.CommandArg2 = mRadioScores[1].mT2;
+    _radioCmdData.CommandArg3 = mRadioScores[1].mS1;
+    _radioCmdData.CommandArg4 = mRadioScores[1].mS2;
+    _radio.send(2, &_radioCmdData, sizeof(_radioCmdData));
+    NeedToNotifyRadio2 = false;
+
+  }  
+  else if (CommandMode.MessageRecieved) {
     _radioCmdData.CommandId = CommandMode.CommandId;
     _radioCmdData.CommandArg1 = CommandMode.Arg1;
     CommandMode.MessageRecieved = false;
@@ -397,7 +419,7 @@ void loop() {
   if (packetSize == sizeof(RadioScorePacket)) {
     _radio.readData(&_radioData);
     uint8_t sender = _radioData.FromRadioId - 1;
-    /*String msg = "Radio ";
+    String msg = "Radio ";
         msg += _radioData.FromRadioId;
         msg += ", ";
         msg += _radioData.T1_Score;
@@ -406,18 +428,27 @@ void loop() {
         msg += " sets: ";
         msg += _radioData.T1_Sets;
         msg += " : ";
-        msg += _radioData.T2_Sets;*/
-    //Serial.println(msg);
+        msg += _radioData.T2_Sets;
+    Serial.println(msg);
     mRadioScores[sender].mT1 = _radioData.T1_Score;
     mRadioScores[sender].mT2 = _radioData.T2_Score;
     mRadioScores[sender].mS1 = _radioData.T1_Sets;
     mRadioScores[sender].mS2 = _radioData.T2_Sets;
     if (sender == mCurrentRadioID)  //only update if we have same radio id ... i.e. we selected to "show" the radio data
     {
-      SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets);
+      SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets,sender);
       NeedToNotifyBLE = true;
     }
-    NeedToNotifyLEDShort = true; //we may specify which matchdata
+    else
+    {
+      //this does not work for multi displays
+      SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets,sender);
+      NeedToNotifyBLE = true;
+    }
+    if(sender ==1)
+    NeedToNotifyLEDShort1 = true; //we may specify which matchdata
+      else
+    NeedToNotifyLEDShort2 = true;
   } else if (packetSize == sizeof(RadioHistoryPacket)) {
 
     uint8_t t1_won = 0;
@@ -500,12 +531,16 @@ void loop() {
     }
   }
   //maybe LED screen need update
-  if(NeedToNotifyLEDShort)
+  if(NeedToNotifyLEDShort1)
   {
-    NeedToNotifyLEDShort = false;
-    SendMatchDataShortToScoreBoard(mCurrentRadioID);
+    NeedToNotifyLEDShort1= false;
+    SendMatchDataShortToScoreBoard(1);
   }
-  return;
+  else   if(NeedToNotifyLEDShort2)
+  {
+    NeedToNotifyLEDShort2= false;
+    SendMatchDataShortToScoreBoard(2);
+  }
 }
 
 
@@ -530,126 +565,13 @@ void radioInterrupt()
 
 
 void UpdateHistory(VolleyBallHistory TheArray[], int n, int sender) {
-  int xpos = tft.width() / 2;  // Half the screen width
-  int ypos = 50;
-  int counter = 5;
-  int MaxSpace = counter * 19 + 2;
-  spr.createSprite(90, MaxSpace);
-  spr.fillSprite(KC_dirty_white);
-  spr.setTextColor(TFT_BLACK, KC_DARKGREY);
-  spr.loadFont(AA_FONT_SMALL);
-  //spr.loadFont(AA_FONT_MONO);
-  for (size_t i = 0; i < n; i++) {
-    if (!TheArray[i].Set) {
-
-    } else {
-      //spr.drawString("(1)",5,i*20);
-      spr.print("(");
-      int j = TheArray[i].Satz + 1;
-      spr.print(j);
-      spr.print(") ");
-      j = (int)TheArray[i].Team1;
-      spr.printf("%02d : ", j);
-      j = (int)TheArray[i].Team2;
-      spr.printf("%02d", j);
-      spr.println("");
-      /*spr.drawString("02",30,i*20);
-      spr.drawString(":",55,i*20);
-       spr.drawString("15",65,i*20);*/
-    }
-  }
-  spr.pushSprite(75, 121);
-  spr.deleteSprite();
-  /*if(counter <= 3)
-  {
-    spr.deleteSprite();
-    spr.loadFont(AA_FONT_MONO);
-    spr.setTextSize(10);
-    spr.createSprite(135, 20);
-    spr.fillSprite(dirty_white);
-    spr.drawString("Beachfreunde",0,0);
-    spr.pushSprite(58, 190); 
-    spr.deleteSprite();
-    spr.createSprite(48,20);
-    spr.fillSprite(dirty_white);
-    
-    //ö  = 0 + zwei Punkte
-    spr.drawString("Pohl",0,0);
-    spr.fillCircle(14,3,1,TFT_BLACK);
-    spr.fillCircle(18,3,1,TFT_BLACK);
-    spr.pushSprite(100, 210); 
-  }*/
+  mDisplay->UpdateHistory(TheArray,n,sender);
 }
-void SetNewScore(int T1, int T2, int S1, int S2) {
-  int xpos = tft.width() / 2;  // Half the screen width
-  int ypos = 50;
-  delay(20);
-
-  spr.loadFont(AA_FONT_LARGE);
-  spr.createSprite(80, 40);
-  spr.fillSprite(KC_grey);
-  spr.setTextColor(KC_dirty_white, KC_DARKGREY);
-  spr.drawNumber(S1, 0, 00);
-  spr.drawString(":", 35, 00);
-  spr.drawNumber(S2, 60, 0);
-  spr.pushSprite(80, 20);  // Push to TFT screen coord 10, 10
-  //Middle in green
-  spr.deleteSprite();
-  spr.createSprite(124, 45);
-  spr.setTextColor(TFT_WHITE, KC_DARKGREY);
-  spr.fillSprite(mRadioScores[mCurrentRadioID].BackgroundColor);
-  if (T1 < 10) {
-    spr.drawNumber(0, 0, 10);
-    spr.drawNumber(T1, 22, 10);
-  } else
-    spr.drawNumber(T1, 0, 10);
-  spr.drawString(":", 55, 10);
-  if (T2 < 10) {
-    spr.drawNumber(0, 80, 10);
-    spr.drawNumber(T2, 102, 10);
-  } else
-    spr.drawNumber(T2, 80, 10);
-  spr.pushSprite(60, 67);
-  spr.deleteSprite();
-}
-
-void DrawVolleyball() {
-  uint16_t m_counter = 0;
-  uint8_t NewY = 0;
-  uint8_t NewX = 0;
-  for (int i = 0; i < 2500; i++) {
-    if (m_counter >= 50) {
-      m_counter = m_counter - 1;
-      NewY++;
-      NewX = 0;
-      m_counter = 0;
-    }
-    if (61309 != volleyball[i])
-      tft.drawPixel(NewX + xpos_volleyball, NewY + ypos_volleyball, volleyball[i]);
-    NewX++;
-    m_counter++;
-  }
+void SetNewScore(int T1, int T2, int S1, int S2,int sender) {
+ mDisplay->SetNewScore(T1,T2,S1,S2,sender);
 }
 
 
-void DrawFox() {
-  uint16_t m_counter = 0;
-  uint8_t NewY = 0;
-  uint8_t NewX = 0;
-  //53 * 50
-  for (int i = 0; i < 2650; i++) {
-    if (m_counter >= 53) {
-      m_counter = m_counter - 1;
-      NewY++;
-      NewX = 0;
-      m_counter = 0;
-    }
-    if (61309 != fox_pic[i])
-      tft.drawPixel(NewX + xpos_fox, NewY + ypos_fox, fox_pic[i]);
-    NewX++;
-    m_counter++;
-  }
-}
 
 void DrehschalterDreh1() {
   //Serial.println("Dreh1");
