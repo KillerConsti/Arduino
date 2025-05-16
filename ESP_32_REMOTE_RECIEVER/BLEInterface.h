@@ -15,6 +15,14 @@ BLECharacteristic* TeamNameCharacteristic = NULL;
 BLECharacteristic* TeamMathNumCharacteristics = NULL;
 BLECharacteristic* TeamNameCharacteristic_Field2 = NULL;
 BLECharacteristic* TeamMathNumCharacteristics_Field2 = NULL;
+
+BLECharacteristic* TeamStatsFromRadio_Match2 = NULL;
+BLECharacteristic* points1Characteristic_Match2 = NULL;
+BLECharacteristic* points2Characteristic_Match2 = NULL;
+BLECharacteristic* sets1Characteristic_Match2 = NULL;
+BLECharacteristic* sets2Characteristic_Match2 = NULL;
+
+
 BLECharacteristic* LEDScrrenModeCharaceristic =NULL;
 #define SERVICE_UUID "19b10000-e8f2-537e-4f6c-d104768a1214"
 #define SENSOR_CHARACTERISTIC_UUID "19b10001-e8f2-537e-4f6c-d104768a1214"
@@ -30,10 +38,18 @@ BLECharacteristic* LEDScrrenModeCharaceristic =NULL;
 #define mTeamMatchNumCharaceristic_Field2 "19b10009-e8f2-537e-4f6c-d104768a1214"
 #define mLEDScrrenModeCharaceristic "19b10010-e8f2-537e-4f6c-d104768a1214"
 
+//Match2 UUIDs
+	#define mPunkte_Team1_Match2 "19b10011-e8f2-537e-4f6c-d104768a1214"
+	#define mPunkte_Team2_Match2 "19b10012-e8f2-537e-4f6c-d104768a1214"
+	#define mSets_Team1_Match2 "19b10013-e8f2-537e-4f6c-d104768a1214"
+	#define mSets_Team2_Match2 "19b10014-e8f2-537e-4f6c-d104768a1214"
+	#define mRadioResult_Match2 "19b10015-e8f2-537e-4f6c-d104768a1214"
+
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
-    NeedToNotifyBLE = true;  //keep us updated pls
+    NeedToNotifyBLE_Match2 = true;  //keep us updated pls
+    NeedToNotifyBLE_Match1 = true;
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -50,23 +66,11 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[mCurrentRadioID].mT1 = constrain(receivedValue, 0, 99);
-      /*if (receivedValue == 1) {
-                digitalWrite(ledPin, HIGH);
-            } else {
-                digitalWrite(ledPin, LOW);
-            }*/
-            if(mCurrentRadioID == 0)
-            {
+      mRadioScores[0].mT1 = constrain(receivedValue, 0, 99);
+
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-            }
-             else /*if(mCurrentRadioID == 1)*/
-            {
-              NeedToNotifyTFT2 = true;
-              NeedToNotifyRadio2 = true;
-            }
-      NeedToNotifyBLE = true;
+              NeedToNotifyBLE_Match1 = true;
     }
   }
 };
@@ -79,26 +83,51 @@ class MyCharacteristicCallbacks2 : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[mCurrentRadioID].mT2 = constrain(receivedValue, 0, 99);
-                  if(mCurrentRadioID == 0)
-            {
+      mRadioScores[0].mT2 = constrain(receivedValue, 0, 99);
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-            }
-            else /*if(mCurrentRadioID == 1)*/
-            {
-              NeedToNotifyTFT2 = true;
-              NeedToNotifyRadio2 = true;
-            }
-      NeedToNotifyBLE = true;
-      /*if (receivedValue == 1) {
-                digitalWrite(ledPin, HIGH);
-            } else {
-                digitalWrite(ledPin, LOW);
-            }*/
+
+      NeedToNotifyBLE_Match1 = true;
     }
   }
 };
+
+class SetPointsTeam1_Match2Callback : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* points1Characteristic_Match2) {
+    String value = points1Characteristic_Match2->getValue();
+    if (value.length() > 0) {
+      Serial.print("Characteristic event, written: ");
+      Serial.println(static_cast<int>(value[0]));  // Print the integer value
+
+      int receivedValue = static_cast<int>(value[0]);
+      Serial.println(receivedValue);
+      mRadioScores[1].mT2 = constrain(receivedValue, 0, 99);
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+
+      NeedToNotifyBLE_Match2 = true;
+    }
+  }
+};
+class SetPointsTeam2_Match2Callback : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* points2Characteristic_Match2) {
+    String value = points2Characteristic_Match2->getValue();
+    if (value.length() > 0) {
+      Serial.print("Characteristic event, written: ");
+      Serial.println(static_cast<int>(value[0]));  // Print the integer value
+
+      int receivedValue = static_cast<int>(value[0]);
+      Serial.println(receivedValue);
+      mRadioScores[1].mT2 = constrain(receivedValue, 0, 99);
+              NeedToNotifyTFT2= true;
+              NeedToNotifyRadio2 = true;
+
+      NeedToNotifyBLE_Match2 = true;
+    }
+  }
+};
+
+
 class MyCharacteristicCallbacks3 : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* ps1Characteristic) {
     String value = ps1Characteristic->getValue();
@@ -108,18 +137,11 @@ class MyCharacteristicCallbacks3 : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[mCurrentRadioID].mS1 = constrain(receivedValue, 0, 3);
-                  if(mCurrentRadioID == 0)
-            {
+      mRadioScores[0].mS1 = constrain(receivedValue, 0, 3);
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-            }
-            else /*if(mCurrentRadioID == 1)*/
-            {
-              NeedToNotifyTFT2 = true;
-              NeedToNotifyRadio2 = true;
-            }
-      NeedToNotifyBLE = true;
+           
+      NeedToNotifyBLE_Match1 = true;
     }
   }
 };
@@ -132,27 +154,54 @@ class MyCharacteristicCallbacks4 : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[mCurrentRadioID].mS2 = constrain(receivedValue, 0, 3);
-                  if(mCurrentRadioID == 0)
-            {
+      mRadioScores[0].mS2 = constrain(receivedValue, 0, 3);
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-            }
-             else /*if(mCurrentRadioID == 1)*/
-            {
-              NeedToNotifyTFT2 = true;
-              NeedToNotifyRadio2 = true;
-            }
-      NeedToNotifyBLE = true;
+      NeedToNotifyBLE_Match1 = true;
     }
   }
 };
 
-class MyCharacteristicCallbacksCMD
+class Set_Sets_Team1_Match2 : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* sets1Characteristic_Match2) {
+    String value = sets1Characteristic_Match2->getValue();
+    if (value.length() > 0) {
+      Serial.print("Characteristic event, written: ");
+      Serial.println(static_cast<int>(value[0]));  // Print the integer value
+
+      int receivedValue = static_cast<int>(value[0]);
+      Serial.println(receivedValue);
+      mRadioScores[1].mS2 = constrain(receivedValue, 0, 3);
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+      NeedToNotifyBLE_Match2 = true;
+    }
+  }
+};
+
+class Set_Sets_Team2_Match2 : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* sets2Characteristic_Match2) {
+    String value = sets2Characteristic_Match2->getValue();
+    if (value.length() > 0) {
+      Serial.print("Characteristic event, written: ");
+      Serial.println(static_cast<int>(value[0]));  // Print the integer value
+
+      int receivedValue = static_cast<int>(value[0]);
+      Serial.println(receivedValue);
+      mRadioScores[1].mS2 = constrain(receivedValue, 0, 3);
+              NeedToNotifyTFT2 = true;
+              NeedToNotifyRadio2 = true;
+      NeedToNotifyBLE_Match2 = true;
+    }
+  }
+};
+
+class MyCharacteristicCallbacksCMD //This is for Sending Softreset/Hardreset/Partymode
   : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* cmdCharacteristic) {
     String value = cmdCharacteristic->getValue();
-    if (value.length() > 0) {
+    if (value.length() <= 0)
+    return;
 
       Serial.print("Characteristic event (button), written: ");
       Serial.println(static_cast<int>(value[0]));  // Print the integer value
@@ -161,37 +210,20 @@ class MyCharacteristicCallbacksCMD
       Serial.println(mreceivedValue);
       if (mreceivedValue == 0)  //soft
       {
-        CommandMode.CommandId = 2;
-        CommandMode.Arg1 = 0;
-        CommandMode.MessageRecieved = true;
-      } else if (mreceivedValue == 1) {
-        CommandMode.CommandId = 2;
-        CommandMode.Arg1 = 1;
-        CommandMode.MessageRecieved = true;
+        CommandMode_field1.CommandId = 2;
+        CommandMode_field1.Arg1 = 0;
+        CommandMode_field1.MessageRecieved = true;
+      } 
+      else if (mreceivedValue == 1)
+       {
+        CommandMode_field1.CommandId = 2;
+        CommandMode_field1.Arg1 = 1;
+        CommandMode_field1.MessageRecieved = true;
       } else if (mreceivedValue == 2)  //PartyModeOn
       {
-        CommandMode.CommandId = 4;
-        CommandMode.Arg1 = 1;
-        CommandMode.MessageRecieved = true;
-      } else if (mreceivedValue == 3) {
-        if (mCurrentRadioID == 0) {
-          return;
-        }
-        mCurrentRadioID = 0;
-        mUpdateScreenColor = true;
-      } else if (mreceivedValue == 4) {
-        if (mCurrentRadioID == 1) {
-          return;
-        }
-        mCurrentRadioID = 1;
-        mUpdateScreenColor = true;
-      } else if (mreceivedValue == 5) {
-        if (mCurrentRadioID == 2) {
-          return;
-        }
-        mCurrentRadioID = 2;
-        mUpdateScreenColor = true;
-      }
+        CommandMode_field1.CommandId = 4;
+        CommandMode_field1.Arg1 = 1;
+        CommandMode_field1.MessageRecieved = true;
     }
   }
 };
@@ -402,7 +434,7 @@ class BLEInterface
    public :
 void BleInterface();
 void initDevice();
-void SendScroreToWebBLE(String Input);
+void SendScroreToWebBLE(String Input,int Matchnum);
 void StartAdvertising();
 };
 
@@ -421,9 +453,7 @@ void BLEInterface::initDevice()
   BLEService* pService = pServer->createService(BLEUUID(SERVICE_UUID), 40, (uint8_t)0);
 
   // Create a BLE Characteristic
-  pSensorCharacteristic = pService->createCharacteristic(
-    SENSOR_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
-
+  pSensorCharacteristic = pService->createCharacteristic(SENSOR_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
   // Create the ON button Characteristic
   pt1Characteristic = pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
   pt2Characteristic = pService->createCharacteristic(T2_CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_WRITE);
@@ -432,6 +462,13 @@ void BLEInterface::initDevice()
   cmdCharacteristic = pService->createCharacteristic(CMD_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
   TeamNameCharacteristic = pService->createCharacteristic(mTeamNameCharaceristic,BLECharacteristic::PROPERTY_WRITE);
   TeamMathNumCharacteristics = pService->createCharacteristic(mTeamMatchNumCharaceristic,BLECharacteristic::PROPERTY_WRITE);
+
+//Field 2
+TeamStatsFromRadio_Match2 = pService->createCharacteristic(mRadioResult_Match2,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
+points1Characteristic_Match2= pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+points2Characteristic_Match2=pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+sets1Characteristic_Match2=pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+sets2Characteristic_Match2= pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
 
     TeamNameCharacteristic_Field2 = pService->createCharacteristic(mTeamNameCharaceristic_Field2,BLECharacteristic::PROPERTY_WRITE);
   TeamMathNumCharacteristics_Field2 = pService->createCharacteristic(mTeamMatchNumCharaceristic_Field2,BLECharacteristic::PROPERTY_WRITE);
@@ -448,6 +485,11 @@ void BLEInterface::initDevice()
 
   TeamNameCharacteristic_Field2->setCallbacks(new MyCharacteristicCallbacksTeamNames_Field2());
   TeamMathNumCharacteristics_Field2->setCallbacks(new MyCharacteristicCallbacksTeamMatch_Field2());
+  //TeamStatsFromRadio_Match2->setCallbacks(new ());
+  points1Characteristic_Match2->setCallbacks(new SetPointsTeam1_Match2Callback());
+  points2Characteristic_Match2->setCallbacks(new SetPointsTeam2_Match2Callback());
+  sets1Characteristic_Match2->setCallbacks(new Set_Sets_Team1_Match2());
+  sets2Characteristic_Match2->setCallbacks(new Set_Sets_Team2_Match2());
 
   LEDScrrenModeCharaceristic->setCallbacks(new LEDScrrenModeCallback());
   // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
@@ -463,6 +505,12 @@ void BLEInterface::initDevice()
 TeamNameCharacteristic_Field2->addDescriptor(new BLE2902());
   TeamMathNumCharacteristics_Field2->addDescriptor(new BLE2902());
   LEDScrrenModeCharaceristic->addDescriptor(new BLE2902());
+
+    TeamStatsFromRadio_Match2->addDescriptor(new BLE2902());
+  points1Characteristic_Match2->addDescriptor(new BLE2902());
+  points2Characteristic_Match2->addDescriptor(new BLE2902());
+  sets1Characteristic_Match2->addDescriptor(new BLE2902());
+  sets2Characteristic_Match2->addDescriptor(new BLE2902());
   // Start the service
   pService->start();
 
@@ -474,10 +522,18 @@ TeamNameCharacteristic_Field2->addDescriptor(new BLE2902());
   BLEDevice::startAdvertising();
 }
 
-void BLEInterface::SendScroreToWebBLE(String Input)
+void BLEInterface::SendScroreToWebBLE(String Input,int Matchnum)
 {
+  if(Matchnum == 1)
+  {
 	      pSensorCharacteristic->setValue(Input.c_str());
       pSensorCharacteristic->notify();
+}
+else //Match 2
+{
+	      TeamStatsFromRadio_Match2->setValue(Input.c_str());
+      TeamStatsFromRadio_Match2->notify();
+}
 }
 void BLEInterface::StartAdvertising()
 {

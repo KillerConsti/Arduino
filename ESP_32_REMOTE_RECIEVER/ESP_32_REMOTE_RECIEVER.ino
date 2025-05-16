@@ -285,7 +285,6 @@ void setup(void) {
   mRadioScores[0].BackgroundColor = 3697;
   mRadioScores[1].BackgroundColor = 61521;  //tft.color565(240,11,140);
   mRadioScores[2].BackgroundColor = 2142;   //tft.color565(11,11,240);
-    mCurrentRadioID = 0; //shall be removed
            mDisplay->initDevice();
         digitalWrite(22,HIGH);
         delay(1000);
@@ -358,12 +357,21 @@ void loop() {
     return;
   }
   CheckInputState();
-  if (mUpdateScreenColor) {
+  if (mUpdateScreenOne) {
     UpdateScreenColor();
-    mUpdateScreenColor = false;
+    mUpdateScreenOne = false;
     _radioCmdData.CommandId = 0;
     //update my score pls
-    _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
+    _radio.send(1, &_radioCmdData, sizeof(_radioCmdData));
+    Serial.println("we sent cmd to radio");
+    return;
+  }
+    if (mUpdateScreenTwo) {
+    UpdateScreenColor();
+    mUpdateScreenTwo = false;
+    _radioCmdData.CommandId = 0;
+    //update my score pls
+    _radio.send(2, &_radioCmdData, sizeof(_radioCmdData));
     Serial.println("we sent cmd to radio");
     return;
   }
@@ -403,11 +411,11 @@ void loop() {
     NeedToNotifyRadio2 = false;
 
   }  
-  else if (CommandMode.MessageRecieved) {
-    _radioCmdData.CommandId = CommandMode.CommandId;
-    _radioCmdData.CommandArg1 = CommandMode.Arg1;
-    CommandMode.MessageRecieved = false;
-    _radio.send(mCurrentRadioID + 1, &_radioCmdData, sizeof(_radioCmdData));
+  else if (CommandMode_field1.MessageRecieved) { //This is for Sending Softreset/Hardreset/Partymode
+    _radioCmdData.CommandId = CommandMode_field1.CommandId;
+    _radioCmdData.CommandArg1 = CommandMode_field1.Arg1;
+    CommandMode_field1.MessageRecieved = false;
+    _radio.send(1, &_radioCmdData, sizeof(_radioCmdData));
     Serial.println("Send a Cmd");
   }
   uint8_t packetSize = _radio.hasData();
@@ -434,21 +442,17 @@ void loop() {
     mRadioScores[sender].mT2 = _radioData.T2_Score;
     mRadioScores[sender].mS1 = _radioData.T1_Sets;
     mRadioScores[sender].mS2 = _radioData.T2_Sets;
-    if (sender == mCurrentRadioID)  //only update if we have same radio id ... i.e. we selected to "show" the radio data
-    {
       SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets,sender);
-      NeedToNotifyBLE = true;
-    }
-    else
-    {
-      //this does not work for multi displays
-      SetNewScore(_radioData.T1_Score, _radioData.T2_Score, _radioData.T1_Sets, _radioData.T2_Sets,sender);
-      NeedToNotifyBLE = true;
-    }
     if(sender ==1)
-    NeedToNotifyLEDShort1 = true; //we may specify which matchdata
+    {
+        NeedToNotifyLEDShort1 = true; //we may specify which matchdata
+        NeedToNotifyBLE_Match1 = true;
+    }
       else
-    NeedToNotifyLEDShort2 = true;
+      {
+        NeedToNotifyLEDShort2 = true;
+        NeedToNotifyBLE_Match2 = true;
+      }
   } else if (packetSize == sizeof(RadioHistoryPacket)) {
 
     uint8_t t1_won = 0;
@@ -479,7 +483,8 @@ void loop() {
     for (uint8_t t = 0; t < 5; t++) {
       mRadioScores[sender].MyVolleyHistory[t] = _radioHistoryData.myVolleyBallHistory[t];
     }
-    if (sender == mCurrentRadioID) {
+    //if (sender == mCurrentRadioID) 
+    {
       UpdateHistory(_radioHistoryData.myVolleyBallHistory, 5, sender);
       Serial.print("Satzverhaeltnis Radio");
       Serial.println(sender);
@@ -499,21 +504,28 @@ void loop() {
   }
   /* BLE*/
   else {
-    if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE) {
+    if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE_Match1) {
       String i = "0,";
-      char buffer[2];  //the ASCII of the integer will be stored in this char array
-      i = i + mRadioScores[mCurrentRadioID].mT1 + ",";
-      i = i + mRadioScores[mCurrentRadioID].mT2 + ",";
-      i = i + mRadioScores[mCurrentRadioID].mS1 + ",";
-      i = i + mRadioScores[mCurrentRadioID].mS2;
+      i = i + mRadioScores[0].mT1 + ",";
+      i = i + mRadioScores[0].mT2 + ",";
+      i = i + mRadioScores[0].mS1 + ",";
+      i = i + mRadioScores[0].mS2;
       Serial.println(i);
-      
-	  mBLEInterface.SendScroreToWebBLE(i);
+	  mBLEInterface.SendScroreToWebBLE(i,1);
       m_BLETime = millis();
-      NeedToNotifyBLE = false;
+      NeedToNotifyBLE_Match1 = false;
       //value++;
       //Serial.print("New value notified: ");
       //Serial.println(value);
+    }
+    else if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE_Match2) {
+          String j = "0,";
+      j = j + mRadioScores[1].mT1 + ",";
+      j = j + mRadioScores[1].mT2 + ",";
+      j = j + mRadioScores[1].mS1 + ",";
+      j = j + mRadioScores[1].mS2;
+	  mBLEInterface.SendScroreToWebBLE(j,2);
+    
     }
     // disconnecting
     if (!deviceConnected && oldDeviceConnected && m_BLETime + 500 < millis()) {
@@ -632,13 +644,9 @@ bool CheckInputState()  //return Anything changed? But only for one Rotary Encod
     if (mDrehschalter.Old_Taster == false) {
       //short button press
       AnythingChanged = true;
-
-      mCurrentRadioID = mCurrentRadioID + 1;
-      if (mCurrentRadioID >= 3)
-        mCurrentRadioID = 0;
-        mUpdateScreenColor = true;
-      Serial.print("|");
-      Serial.println(mCurrentRadioID);
+      //This might be unnecessary. Give drehschalter a new  
+    mUpdateScreenOne = true;
+    mUpdateScreenTwo = true;
     }
   }
   if ((mDrehschalter.Old_Relative_Position == LOW) && (mDrehschalter.CLK_Wert_n == HIGH)) {
@@ -652,8 +660,6 @@ bool CheckInputState()  //return Anything changed? But only for one Rotary Encod
     Serial.print( mDrehschalter.DrehPosition);
     Serial.print("|");
     Serial.print(mDrehschalter.Current_Taster);
-    Serial.print("|");
-    Serial.println(mCurrentRadioID);
     AnythingChanged = true;
   }
   mDrehschalter.Old_Relative_Position = mDrehschalter.CLK_Wert_n;

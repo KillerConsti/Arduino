@@ -77,8 +77,8 @@ const static uint8_t RADIO_ID = 1;
 const static uint8_t DESTINATION_RADIO_ID = 0;
 const static uint8_t PIN_RADIO_CE = 19; // 9 or 10 depending on test condition
 const static uint8_t PIN_RADIO_CSN = 20;
-const static uint8_t PIN_RADIO_IRQ = 21;
-
+const static uint8_t PIN_RADIO_IRQ = 18;
+volatile uint8_t _dataWasReceived; // Note usage of volatile since the variable is used in the radio interrupt
 
 #define USE_ADAFRUIT_GFX_LAYERS
 
@@ -127,10 +127,7 @@ SMARTMATRIX_ALLOCATE_BUFFERS(matrix, kMatrixWidth, kMatrixHeight, kRefreshDepth,
 //   to different size than the matrix bounds.  We allocate several times the default amount of memory here:
 // Basing the bitmap allocation on the matrix size doesn't make much sense, as the size of the scrolling text is mostly independent of matrix size
 //   Here we allocate an amount of memory that is known to work as a 6kb wide bitmap, with height of 1.  The layer will resize the bitmap to fit the text
-SMARTMATRIX_ALLOCATE_GFX_MONO_LAYER(scrollingLayer01, kMatrixWidth, kMatrixHeight, 6*1024, 1, COLOR_DEPTH, kScrollingLayerOptions);
 
-// The required sizes for some of the layers are printed out to serial, so these layers can be sized exactly to the needed bitmap dimensions
-SMARTMATRIX_ALLOCATE_GFX_MONO_LAYER(scrollingLayer02, kMatrixWidth, kMatrixHeight, 168, 48, COLOR_DEPTH, kScrollingLayerOptions);
 //SMARTMATRIX_ALLOCATE_GFX_MONO_LAYER(scrollingLayer03, kMatrixWidth, kMatrixHeight, 224, 40, COLOR_DEPTH, kScrollingLayerOptions);
 const uint8_t kIndexedLayerOptions = (SM_INDEXED_OPTIONS_NONE);
 const uint8_t kBackgroundLayerOptions = (SM_BACKGROUND_OPTIONS_NONE);
@@ -354,6 +351,33 @@ void ShowNextMatchScreen()
 void WriteLetter(SMLayerGFXMono<rgb24, rgb1, 0> *layer,char Letter)
 {
   //look for umlauts
+  //notice if we use umlauts we loose one char as it casts a *195*
+
+  Serial.print(" ");
+  Serial.print(Letter);
+  Serial.print(" ");
+  Serial.print(static_cast<int>(Letter));
+  int num =static_cast<int>(Letter);
+  if(num == 195)
+  {
+    return;
+  }
+  if(num == 164) //ä
+  {
+    layer->write(0x84);
+    return;
+  }
+      if(num == 182) //ö
+  {
+    layer->write(0x94);
+    return;
+  }
+    if(num == 188) //ü
+  {
+    layer->write(0x81);
+    return;
+  }
+  
   layer->print(Letter);
 }
 void ShowCurrentMatchScreen()
@@ -489,8 +513,6 @@ void setup() {
 matrix.addLayer(&picture_layer);
 matrix.addLayer(&backgroundLayer);
   matrix.addLayer(&points_match1); 
-  //matrix.addLayer(&scrollingLayer01); 
-  //matrix.addLayer(&scrollingLayer02); 
   matrix.addLayer(&scrollingLayer03); 
   matrix.addLayer(&sets_match1_layer);
 
@@ -500,15 +522,9 @@ matrix.addLayer(&sets_match2);
   matrix.begin();
 
   points_match1.setColor(rgb24(0, 255, 0));
-  scrollingLayer01.setColor(chooseRandomBrightColor());
-  scrollingLayer02.setColor(chooseRandomBrightColor());
   scrollingLayer03.setColor(rgb24(0, 40, 255));
 
   points_match1.setSpeed(0);
-  scrollingLayer01.setSpeed(0);
-  scrollingLayer02.setSpeed(0);
-  scrollingLayer01.setFont(&FreeMonoBold18pt7b);
-  scrollingLayer02.setFont(&FreeSerif24pt7b);
 
 
 
@@ -517,56 +533,15 @@ matrix.addLayer(&sets_match2);
         scrollingLayer03.fillScreen(0);
         //scrollingLayer03.setCursor(30, 50);
         //scrollingLayer03.println("00 : 25");
-        scrollingLayer03.setCursor(2, 2);
-        scrollingLayer03.println("Beachfreunde");
-        scrollingLayer03.setCursor(22, 11);
-        scrollingLayer03.println("vs.");
-        scrollingLayer03.setCursor(2, 22);
-        scrollingLayer03.println("Team 2");
-       scrollingLayer03.swapBuffers(false);
 
        points_match1.setFont(&FreeSans10pt7b);
-       points_match1.setCursor(75, 15);
-       points_match1.println("00:25");
-      points_match1.swapBuffers(false);
-       backgroundLayer.setColor(rgb24(0, 180, 180));
-      backgroundLayer.drawRect(0, 0, 128,32, 0xFFE0);
-      backgroundLayer.drawRect(0, 32, 128,32, 0xFFE0);
-      backgroundLayer.swapBuffers(false);
-
-
-        //sets_match1_layer.setFont(&FreeSans10pt7b);
         sets_match1_layer.setColor(rgb24(0, 255, 0));
-       sets_match1_layer.setCursor(86, 21);
-       sets_match1_layer.println("(0:1)");
-      sets_match1_layer.swapBuffers(false);
-
-      //match 2
-      //teams_match2
       teams_match2.setColor(rgb24(0, 40, 255));
-          teams_match2.setCursor(2, 32+2);
-        teams_match2.println("Ebersbrunn");
-        teams_match2.setCursor(22, 32+11);
-        teams_match2.println("vs.");
-        teams_match2.setCursor(2, 32+22);
-        teams_match2.print("Volleyb");
-        //ä  0x84
-        //ö 0x94
-        //ü 0x81 
-        teams_match2.write(0x84);   // Print the u-with-umlauts
-        teams_match2.print("ren");
-       teams_match2.swapBuffers(false);
-
       points_match2.setColor(rgb24(0, 255, 0));
               points_match2.setFont(&FreeSans10pt7b);
-       points_match2.setCursor(75, 32+15);
-       points_match2.println("12:09");
-      points_match2.swapBuffers(false);
-
+  
               sets_match2.setColor(rgb24(0, 255, 0));
        sets_match2.setCursor(86, 21+32);
-       sets_match2.println("(0:1)");
-      sets_match2.swapBuffers(false);
 
        //init radio
    if (!_radio.init(8, 20, 19)) {
@@ -584,6 +559,27 @@ matrix.addLayer(&sets_match2);
   delay(2000);
   ClearScreen();
   ShowCurrentMatchScreen();
+
+  attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
+}
+
+void radioInterrupt()
+{
+    // Ask the radio what caused the interrupt.  This also resets the IRQ pin on the
+    // radio so a new interrupt can be triggered.
+
+    uint8_t txOk, txFail, rxReady;
+    _radio.whatHappened(txOk, txFail, rxReady);
+
+    // txOk = the radio successfully transmitted data.
+    // txFail = the radio failed to transmit data.
+    // rxReady = the radio received data.
+
+    if (rxReady)
+    {
+        _dataWasReceived = true;
+        NewRadioEvent();
+    }
 }
 
 bool RecievedMatchDataLong()
@@ -591,6 +587,8 @@ bool RecievedMatchDataLong()
       _radio.readData(&_radio_matchDataLong);
     uint8_t matchtype = _radio_matchDataLong.type;
     Serial.println(matchtype);
+    Serial.println(_radio_matchDataLong.TeamName1);
+    Serial.println(_radio_matchDataLong.TeamName2);
     Match* MyMatch = &mMatch1;
     if(matchtype == 2)
     {
@@ -611,7 +609,13 @@ bool RecievedMatchDataLong()
 
 bool NewRadioEvent()
 {
-  uint8_t packetSize = _radio.hasData();
+
+   if (!_dataWasReceived)
+   return false;
+        _dataWasReceived = false;
+        Serial.print("Recieved Radio Data ");
+        
+  uint8_t packetSize = _radio.hasDataISR();
   if(packetSize == 0)
   return false;
    Serial.println(packetSize);
@@ -694,9 +698,11 @@ bool RecievedMatchDataShort()
     return true;
 }
 void loop() {
-  if(NewRadioEvent())
+  /*if(NewRadioEvent())
   {
-  }
+    delay(500);
+    return;
+  }*/
   if(mRadioChangeEvent.LittleDataChange)
   {
       Serial.println("we recieved little data change");
@@ -808,23 +814,8 @@ void ChangeTeamNames(int MatchNum)
           char currentchar = _radio_matchDataLong.TeamName1[t];
           MyMatch->Teamname1[t] = currentchar;
           Serial.print(currentchar);
-          Serial.println(static_cast<uint8_t>(currentchar));
-          if(currentchar == 'ä')
-          {
-            MyLayerTeams->write(0x84);   // Print the u-with-umlauts
-          }
-          else if (currentchar == 'ö')
-          {
-            MyLayerTeams->write(0x94);
-          }
-          else if (currentchar == 'ü')
-          {
-            MyLayerTeams->write(0x81);
-          }
-          else
-          {
-            MyLayerTeams->print(currentchar);
-          }
+          
+          WriteLetter(MyLayerTeams,currentchar);
         }
         Serial.println("");
         MyLayerTeams->setCursor(22, y_Offset+11);
@@ -838,22 +829,7 @@ void ChangeTeamNames(int MatchNum)
           char currentchar = _radio_matchDataLong.TeamName2[t];
           MyMatch->Teamname2[t] = currentchar;
           Serial.print(currentchar);
-          if(currentchar == 'ä')
-          {
-            MyLayerTeams->write(0x84);   // Print the u-with-umlauts
-          }
-          else if (currentchar == 'ö')
-          {
-            MyLayerTeams->write(0x94);
-          }
-          else if (currentchar == 'ü')
-          {
-            MyLayerTeams->write(0x81);
-          }
-          else
-          {
-            MyLayerTeams->print(currentchar);
-          }
+          WriteLetter(MyLayerTeams,currentchar);
         }
         Serial.println("");
         

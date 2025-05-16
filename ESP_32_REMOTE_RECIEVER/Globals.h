@@ -36,7 +36,8 @@ struct Drehschalter
 
 /*shared betweend classes*/
 
-bool NeedToNotifyBLE = false;
+bool NeedToNotifyBLE_Match1 = false;
+bool NeedToNotifyBLE_Match2 = false;
 bool NeedToNotifyTFT1 = false;
 bool NeedToNotifyTFT2 = false;
 bool NeedToNotifyRadio1 = false;
@@ -48,6 +49,9 @@ bool NeedToNotifyLEDCurrentMatchData1 = false;
 bool NeedToNotifyLEDCurrentMatchData2 = false;
 int LEDScreenMode =0;
 bool NeedToUpdateScreenMode = false;
+
+bool mUpdateScreenOne = false;
+bool mUpdateScreenTwo = false;
 
 //Radio
 
@@ -113,7 +117,7 @@ struct CommandMsg {
   int Arg1 = 0;
 };
 
-CommandMsg CommandMode;
+CommandMsg CommandMode_field1;
 int mValidTeamNamesField1 = 30;
 int mValidTeamNamesField2 =30;
 volatile bool NeedToSendMachData_1_CurrentMatch = false;
