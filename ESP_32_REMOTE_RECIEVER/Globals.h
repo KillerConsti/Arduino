@@ -35,9 +35,8 @@ struct Drehschalter
 
 
 /*shared betweend classes*/
-
-bool NeedToNotifyBLE_Match1 = false;
-bool NeedToNotifyBLE_Match2 = false;
+#define TeamnameLength 14
+bool NeedToNotifyBLE_BothMatches = false;
 bool NeedToNotifyTFT1 = false;
 bool NeedToNotifyTFT2 = false;
 bool NeedToNotifyRadio1 = false;
@@ -52,7 +51,8 @@ bool NeedToUpdateScreenMode = false;
 
 bool mUpdateScreenOne = false;
 bool mUpdateScreenTwo = false;
-
+bool mNeedToUpdateNextMatchField1 = false;
+bool mNeedToUpdateNextMatchField2 = false;
 //Radio
 
 struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can be sent.
@@ -78,8 +78,8 @@ struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can b
 {
   uint8_t MatchNum; //we can track 3 matches
   uint8_t type; //1-3 are current matchdata //4-6 are next match data
-  char TeamName1[12];
-  char TeamName2[12];
+  char TeamName1[TeamnameLength];
+  char TeamName2[TeamnameLength];
 };
 
 struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can be sent.
@@ -144,14 +144,14 @@ struct ScoreBoard_over_Raio {
   VolleyBallHistory MyVolleyHistory[5];
   uint16_t BackgroundColor;
 };
-
+//ScoreBoard_over_Raio.size();
 uint8_t mCurrentRadioID = 0;
 //this id -1
 ScoreBoard_over_Raio mRadioScores[3];
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
 //up to 15 games (30/2)
-char MatchNameData_Field1[12][30];
+char MatchNameData_Field1[TeamnameLength][30];
 volatile int currentMatch_Field1= -1;
-char MatchNameData_Field2[12][30];
+char MatchNameData_Field2[TeamnameLength][30];
 volatile int currentMatch_Field2 = -1;

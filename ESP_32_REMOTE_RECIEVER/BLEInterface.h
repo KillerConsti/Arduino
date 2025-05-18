@@ -48,8 +48,7 @@ BLECharacteristic* LEDScrrenModeCharaceristic =NULL;
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
-    NeedToNotifyBLE_Match2 = true;  //keep us updated pls
-    NeedToNotifyBLE_Match1 = true;
+    NeedToNotifyBLE_BothMatches = true;  //keep us updated pls
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -70,7 +69,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks {
 
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-              NeedToNotifyBLE_Match1 = true;
+              NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -87,7 +86,7 @@ class MyCharacteristicCallbacks2 : public BLECharacteristicCallbacks {
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
 
-      NeedToNotifyBLE_Match1 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -101,11 +100,11 @@ class SetPointsTeam1_Match2Callback : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[1].mT2 = constrain(receivedValue, 0, 99);
+      mRadioScores[1].mT1 = constrain(receivedValue, 0, 99);
               NeedToNotifyTFT2 = true;
               NeedToNotifyRadio2 = true;
 
-      NeedToNotifyBLE_Match2 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -122,7 +121,7 @@ class SetPointsTeam2_Match2Callback : public BLECharacteristicCallbacks {
               NeedToNotifyTFT2= true;
               NeedToNotifyRadio2 = true;
 
-      NeedToNotifyBLE_Match2 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -141,7 +140,7 @@ class MyCharacteristicCallbacks3 : public BLECharacteristicCallbacks {
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
            
-      NeedToNotifyBLE_Match1 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -157,7 +156,7 @@ class MyCharacteristicCallbacks4 : public BLECharacteristicCallbacks {
       mRadioScores[0].mS2 = constrain(receivedValue, 0, 3);
               NeedToNotifyTFT1 = true;
               NeedToNotifyRadio1 = true;
-      NeedToNotifyBLE_Match1 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -171,10 +170,10 @@ class Set_Sets_Team1_Match2 : public BLECharacteristicCallbacks {
 
       int receivedValue = static_cast<int>(value[0]);
       Serial.println(receivedValue);
-      mRadioScores[1].mS2 = constrain(receivedValue, 0, 3);
+      mRadioScores[1].mS1 = constrain(receivedValue, 0, 3);
               NeedToNotifyTFT2 = true;
               NeedToNotifyRadio2 = true;
-      NeedToNotifyBLE_Match2 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -191,7 +190,7 @@ class Set_Sets_Team2_Match2 : public BLECharacteristicCallbacks {
       mRadioScores[1].mS2 = constrain(receivedValue, 0, 3);
               NeedToNotifyTFT2 = true;
               NeedToNotifyRadio2 = true;
-      NeedToNotifyBLE_Match2 = true;
+      NeedToNotifyBLE_BothMatches = true;
     }
   }
 };
@@ -268,7 +267,7 @@ class MyCharacteristicCallbacksTeamNames
       //Serial.print("Team Names written: ");
       //Serial.println(value);  // Print the integer value
       Serial.println(TeamNameCharacteristic->getLength());
-      char TeamName[13];
+      char TeamName[TeamnameLength+1];
       int LastFinish = 0;
       for(size_t t= 0 ; t < TeamNameCharacteristic->getLength();t++)
       {
@@ -278,12 +277,12 @@ class MyCharacteristicCallbacksTeamNames
         char CurrentVal = value[t];
         if(CurrentVal ==':')
         {
-          for(size_t u = t-LastFinish ; u < 12;u++)
+          for(size_t u = t-LastFinish ; u < TeamnameLength;u++)
           {
             TeamName[u] = ' ';
             MatchNameData_Field1[u][TeamnameNumber] = ' ';
           }
-          TeamName[12] = '\0';
+          TeamName[TeamnameLength] = '\0';
           Serial.println(TeamName);
           LastFinish =t+1;
           TeamnameNumber++;
@@ -292,13 +291,13 @@ class MyCharacteristicCallbacksTeamNames
         else if (CurrentVal =='\n')
         {
           Serial.print("found new line ");
-                    for(size_t u = t-LastFinish ; u < 12;u++)
+                    for(size_t u = t-LastFinish ; u < TeamnameLength;u++)
                               {
             TeamName[u] = ' ';
             MatchNameData_Field1[u][TeamnameNumber] = ' ';
             
           }
-          TeamName[12] = '\0';
+          TeamName[TeamnameLength] = '\0';
           Serial.println(TeamName);
           TeamnameNumber++;
 
@@ -307,7 +306,7 @@ class MyCharacteristicCallbacksTeamNames
         }
         else 
         {
-          if(t-LastFinish > 11) //Limit of 12 chars
+          if(t-LastFinish > TeamnameLength-1) //Limit of 12 chars
           continue;
           TeamName[t-LastFinish] = value[t];
           MatchNameData_Field1[t-LastFinish][TeamnameNumber] = value[t];
@@ -364,7 +363,7 @@ class MyCharacteristicCallbacksTeamNames_Field2
       //Serial.print("Team Names written: ");
       //Serial.println(value);  // Print the integer value
       Serial.println(TeamNameCharacteristic_Field2->getLength());
-      char TeamName[13];
+      char TeamName[TeamnameLength+1];
       int LastFinish = 0;
       for(size_t t= 0 ; t < TeamNameCharacteristic_Field2->getLength();t++)
       {
@@ -374,12 +373,12 @@ class MyCharacteristicCallbacksTeamNames_Field2
         char CurrentVal = value[t];
         if(CurrentVal ==':')
         {
-          for(size_t u = t-LastFinish ; u < 12;u++)
+          for(size_t u = t-LastFinish ; u < TeamnameLength;u++)
           {
             TeamName[u] = ' ';
             MatchNameData_Field2[u][TeamnameNumber] = ' ';
           }
-          TeamName[12] = '\0';
+          TeamName[TeamnameLength] = '\0';
           Serial.println(TeamName);
           LastFinish =t+1;
           TeamnameNumber++;
@@ -388,13 +387,13 @@ class MyCharacteristicCallbacksTeamNames_Field2
         else if (CurrentVal =='\n')
         {
           Serial.print("found new line ");
-                    for(size_t u = t-LastFinish ; u < 12;u++)
+                    for(size_t u = t-LastFinish ; u < TeamnameLength;u++)
                               {
             TeamName[u] = ' ';
             MatchNameData_Field2[u][TeamnameNumber] = ' ';
             
           }
-          TeamName[12] = '\0';
+          TeamName[TeamnameLength] = '\0';
           Serial.println(TeamName);
           TeamnameNumber++;
 
@@ -403,7 +402,7 @@ class MyCharacteristicCallbacksTeamNames_Field2
         }
         else 
         {
-          if(t-LastFinish > 11) //Limit of 12 chars
+          if(t-LastFinish > TeamnameLength-1) //Limit of 12 chars
           continue;
           TeamName[t-LastFinish] = value[t];
           MatchNameData_Field2[t-LastFinish][TeamnameNumber] = value[t];
@@ -434,7 +433,7 @@ class BLEInterface
    public :
 void BleInterface();
 void initDevice();
-void SendScroreToWebBLE(String Input,int Matchnum);
+void SendScroreToWebBLE(String Input);
 void StartAdvertising();
 };
 
@@ -450,7 +449,7 @@ void BLEInterface::initDevice()
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Create the BLE Service
-  BLEService* pService = pServer->createService(BLEUUID(SERVICE_UUID), 40, (uint8_t)0);
+  BLEService* pService = pServer->createService(BLEUUID(SERVICE_UUID), 60, (uint8_t)0);
 
   // Create a BLE Characteristic
   pSensorCharacteristic = pService->createCharacteristic(SENSOR_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
@@ -465,10 +464,10 @@ void BLEInterface::initDevice()
 
 //Field 2
 TeamStatsFromRadio_Match2 = pService->createCharacteristic(mRadioResult_Match2,BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE);
-points1Characteristic_Match2= pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
-points2Characteristic_Match2=pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
-sets1Characteristic_Match2=pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
-sets2Characteristic_Match2= pService->createCharacteristic(T1_CHARACTERISTIC_UUID,BLECharacteristic::PROPERTY_WRITE);
+points1Characteristic_Match2= pService->createCharacteristic(mPunkte_Team1_Match2,BLECharacteristic::PROPERTY_WRITE);
+points2Characteristic_Match2=pService->createCharacteristic(mPunkte_Team2_Match2,BLECharacteristic::PROPERTY_WRITE);
+sets1Characteristic_Match2=pService->createCharacteristic(mSets_Team1_Match2,BLECharacteristic::PROPERTY_WRITE);
+sets2Characteristic_Match2= pService->createCharacteristic(mSets_Team2_Match2,BLECharacteristic::PROPERTY_WRITE);
 
     TeamNameCharacteristic_Field2 = pService->createCharacteristic(mTeamNameCharaceristic_Field2,BLECharacteristic::PROPERTY_WRITE);
   TeamMathNumCharacteristics_Field2 = pService->createCharacteristic(mTeamMatchNumCharaceristic_Field2,BLECharacteristic::PROPERTY_WRITE);
@@ -522,18 +521,10 @@ TeamNameCharacteristic_Field2->addDescriptor(new BLE2902());
   BLEDevice::startAdvertising();
 }
 
-void BLEInterface::SendScroreToWebBLE(String Input,int Matchnum)
+void BLEInterface::SendScroreToWebBLE(String Input)
 {
-  if(Matchnum == 1)
-  {
 	      pSensorCharacteristic->setValue(Input.c_str());
       pSensorCharacteristic->notify();
-}
-else //Match 2
-{
-	      TeamStatsFromRadio_Match2->setValue(Input.c_str());
-      TeamStatsFromRadio_Match2->notify();
-}
 }
 void BLEInterface::StartAdvertising()
 {

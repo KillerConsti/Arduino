@@ -100,7 +100,7 @@ void SetCurrentMatchField1(int mMatchNum)
     return;
   }
   //copy data
-  for(size_t t=0; t <12; t++)
+  for(size_t t=0; t <TeamnameLength; t++)
   {
     Serial.print(MatchNameData_Field1[t][mMatchNum*2]);
     Serial.print(" ");
@@ -140,7 +140,7 @@ void SetNextMatchField1(int mMatchNumCurrentMatch)
     return;
   }
   //copy data
-  for(size_t t=0; t <12; t++)
+  for(size_t t=0; t <TeamnameLength; t++)
   {
     mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][NextMatchNum*2];
     mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][NextMatchNum*2+1];
@@ -174,7 +174,7 @@ void SetCurrentMatchField2(int mMatchNum)
     return;
   }
   //copy data
-  for(size_t t=0; t <12; t++)
+  for(size_t t=0; t <TeamnameLength; t++)
   {
     mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][mMatchNum*2];
     mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][mMatchNum*2+1];
@@ -211,7 +211,7 @@ void SetNextMatchField2(int mMatchNumCurrentMatch)
     return;
   }
   //copy data
-  for(size_t t=0; t <12; t++)
+  for(size_t t=0; t <TeamnameLength; t++)
   {
     mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][NextMatchNum*2];
     mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][NextMatchNum*2+1];
@@ -378,7 +378,7 @@ void loop() {
   if (NeedToNotifyTFT1) {
     Serial.println("need to notify tft");
     //in this case we only call this fct from BLE
-    SetNewScore(mRadioScores[0].mT1, mRadioScores[0].mT2, mRadioScores[0].mS1, mRadioScores[0].mS2,1);
+    SetNewScore(mRadioScores[0].mT1, mRadioScores[0].mT2, mRadioScores[0].mS1, mRadioScores[0].mS2,0);
     NeedToNotifyTFT1 = false;
     
   }
@@ -386,7 +386,7 @@ void loop() {
   {
     Serial.println("need to notify tft 2");
     //in this case we only call this fct from BLE
-    SetNewScore(mRadioScores[1].mT1, mRadioScores[1].mT2, mRadioScores[1].mS1, mRadioScores[1].mS2,2);
+    SetNewScore(mRadioScores[1].mT1, mRadioScores[1].mT2, mRadioScores[1].mS1, mRadioScores[1].mS2,1);
     NeedToNotifyTFT2 = false;
   }
   if (NeedToNotifyRadio1) {
@@ -446,12 +446,12 @@ void loop() {
     if(sender ==1)
     {
         NeedToNotifyLEDShort1 = true; //we may specify which matchdata
-        NeedToNotifyBLE_Match1 = true;
+        NeedToNotifyBLE_BothMatches = true;
     }
       else
       {
         NeedToNotifyLEDShort2 = true;
-        NeedToNotifyBLE_Match2 = true;
+        NeedToNotifyBLE_BothMatches = true;
       }
   } else if (packetSize == sizeof(RadioHistoryPacket)) {
 
@@ -504,28 +504,23 @@ void loop() {
   }
   /* BLE*/
   else {
-    if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE_Match1) {
+    if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE_BothMatches) {
       String i = "0,";
       i = i + mRadioScores[0].mT1 + ",";
       i = i + mRadioScores[0].mT2 + ",";
       i = i + mRadioScores[0].mS1 + ",";
-      i = i + mRadioScores[0].mS2;
+      i = i + mRadioScores[0].mS2 + ",";
+      i = i + mRadioScores[1].mT1 + ",";
+      i = i + mRadioScores[1].mT2 + ",";
+      i = i + mRadioScores[1].mS1 + ",";
+      i = i + mRadioScores[1].mS2;
       Serial.println(i);
-	  mBLEInterface.SendScroreToWebBLE(i,1);
+	  mBLEInterface.SendScroreToWebBLE(i);
       m_BLETime = millis();
-      NeedToNotifyBLE_Match1 = false;
+      NeedToNotifyBLE_BothMatches = false;
       //value++;
       //Serial.print("New value notified: ");
       //Serial.println(value);
-    }
-    else if (deviceConnected && m_BLETime + 50 < millis() && NeedToNotifyBLE_Match2) {
-          String j = "0,";
-      j = j + mRadioScores[1].mT1 + ",";
-      j = j + mRadioScores[1].mT2 + ",";
-      j = j + mRadioScores[1].mS1 + ",";
-      j = j + mRadioScores[1].mS2;
-	  mBLEInterface.SendScroreToWebBLE(j,2);
-    
     }
     // disconnecting
     if (!deviceConnected && oldDeviceConnected && m_BLETime + 500 < millis()) {

@@ -36,9 +36,8 @@
             <div class="card">
 				<h2>Feld 1</h2>
 				<p>
-                <h2>Aktueller Satz</h2>
 	
-				<h3 style ="color:blue;text-align:center; " id="CurrentPlayingTeams_Match1">Beachfreunde : 123456789012<h3>
+				<h3 style ="color:blue;text-align:center; " id="CurrentPlayingTeams_Match1"><h3>
 				<p class="reading"><span id="value_scores">NaN</span></p>
 				<div style ="left:10px;">
 				<input type="number" style ="max-width: 50px;" id="myNumber" value="2">
@@ -61,7 +60,7 @@
 				</div>
 			 <h2>Team Names</h2>
 
-<textarea id="w3review" name="w3review" rows="4" cols="50">
+<textarea id="TeamNamesField1" name="w3review" rows="4" cols="50">
 BeachfreundE:TeamE2
 EbersbrunN:VolleybäreN
 </textarea>
@@ -75,8 +74,7 @@ EbersbrunN:VolleybäreN
 			
 			<h2>Feld 2</h2>
 				<p>
-                <h2>Aktueller Satz</h2>
-				<h3 style ="color:blue;text-align:center; " id="CurrentPlayingTeams_Match2">Beachfreunde : 123456789012<h3>
+				<h3 style ="color:blue;text-align:center; " id="CurrentPlayingTeams_Match2"><h3>
 
 				<p class="reading"><span id="value_scores_feld2">NaN</span></p>
 				<div style ="left:10px;">
@@ -143,8 +141,8 @@ EbersbrunN:VolleybäreN
 	const leftnum_feld2_button = document.getElementById('leftnum_feld2_button');
     const rightnum_feld2_button = document.getElementById('rightnum_feld2_button');
 	
-	const sets_feld_2_left = document.getElementById('sets_feld_2_left');
-	const sets_feld_2_right = document.getElementById('sets_feld_2_right');
+	const sets_feld_2_left = document.getElementById('leftset_feld2_button');
+	const sets_feld_2_right = document.getElementById('rightset_feld2_button');
 	//value_sets_feld2">NaN</span></p>
 	
 	// Fehlt für Anzeige 2
@@ -153,7 +151,6 @@ EbersbrunN:VolleybäreN
 	const PartyMode = document.getElementById('PartyMode');
 	
 	const SendNamesF2 = document.getElementById('SendNamesF2');
-	const Textfield = document.getElementById('w3review');
 	const SendNumber1s = document.getElementById('SendNumber1');
 	
 		const SendTeamNames = document.getElementById('SendNames');
@@ -252,7 +249,7 @@ EbersbrunN:VolleybäreN
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mSets_Team2_Match2:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -276,7 +273,7 @@ EbersbrunN:VolleybäreN
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mSets_Team1_Match2:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -291,7 +288,7 @@ EbersbrunN:VolleybäreN
 	
 		    function WritePointsTeam1_Match2(){
         if (bleServer && bleServer.connected) {
-		value = document.getElementById('rightnum_feld2').valueAsNumber;
+		value = document.getElementById('leftnum_feld2').valueAsNumber;
             bleServiceFound.getCharacteristic(mPunkte_Team1_Match2)
             .then(characteristic => {
                 console.log("Found the mPunkte_Team2_Match2 characteristic: ", characteristic.uuid);
@@ -300,7 +297,7 @@ EbersbrunN:VolleybäreN
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mPunkte_Team2_Match2:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -314,8 +311,8 @@ EbersbrunN:VolleybäreN
 	
 			    function WritePointsTeam2_Match2(){
         if (bleServer && bleServer.connected) {
-		value = document.getElementById('leftnum_feld2').valueAsNumber;
-            bleServiceFound.getCharacteristic(mPunkte_Team1_Match2)
+		value = document.getElementById('rightnum_feld2').valueAsNumber;
+            bleServiceFound.getCharacteristic(mPunkte_Team2_Match2)
             .then(characteristic => {
                 console.log("Found the mPunkte_Team1_Match2 characteristic: ", characteristic.uuid);
                 const data = new Uint8Array([value]);
@@ -323,7 +320,7 @@ EbersbrunN:VolleybäreN
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mPunkte_Team1_Match2:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -334,7 +331,31 @@ EbersbrunN:VolleybäreN
             window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
         }
     }
+	function UpdateNamesMatch2()
+	{
+						//split
+				var linecount = document.getElementById('matchnum2').value;
+				const newValueReceived = TeamNamesF2.value;
+				const lines = newValueReceived.split('\n');
+				if(lines.length >= linecount)
+				{
+					CurrentPlayingTeams_Match2.innerHTML = lines[linecount];
+					console.log ("UpdateNamesMatch2")
+				}
+	}
 	
+		function UpdateNamesMatch1()
+	{
+						//split
+				var linecount = document.getElementById('matchnum1').value;
+				const newValueReceived = TeamNamesField1.value;
+				const lines = newValueReceived.split('\n');
+				if(lines.length >= linecount)
+				{
+					CurrentPlayingTeams_Match1.innerHTML = lines[linecount];
+					console.log ("UpdateNamesMatch1")
+				}
+	}
 		function SendNumberF2_func()
 	{
 	if (bleServer && bleServer.connected) {
@@ -343,12 +364,13 @@ EbersbrunN:VolleybäreN
             bleServiceFound.getCharacteristic(mCurrentGameCharacteristic_Fiel2)
             .then(characteristic => {
                 console.log("Found the mCurrentGameCharacteristic_Fiel2: ", characteristic.uuid);
+				UpdateNamesMatch2();
                 const data = new Uint8Array([value]);
                 return characteristic.writeValue(data);
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mCurrentGameCharacteristic_Fiel2:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -379,6 +401,7 @@ EbersbrunN:VolleybäreN
                 console.log("Found the mTeamNameCharaceristic_Field2: ", characteristic.uuid);
                 //const data = new Uint8Array([value]);
                 //return characteristic.writeValue(data);
+				UpdateNamesMatch2()
 				return characteristic.writeValue(new TextEncoder().encode(value));
             })
             .then(() => {
@@ -463,13 +486,14 @@ EbersbrunN:VolleybäreN
 		console.log("mCurrentGameChar");
             bleServiceFound.getCharacteristic(mCurrentGameChar)
             .then(characteristic => {
-                console.log("Found the T2 characteristic: ", characteristic.uuid);
+                console.log("Found the mCurrentGameChar characteristic: ", characteristic.uuid);
                 const data = new Uint8Array([value]);
+				UpdateNamesMatch1();
                 return characteristic.writeValue(data);
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mCurrentGameChar:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -484,18 +508,19 @@ EbersbrunN:VolleybäreN
 	function SendTeamNames_func()
 	{
         if (bleServer && bleServer.connected) {
-		value = document.getElementById('w3review').value;
+		value = document.getElementById('TeamNamesField1').value;
 		console.log("mTeamNameCharaceristic");
             bleServiceFound.getCharacteristic(mTeamNameCharaceristic)
             .then(characteristic => {
-                console.log("Found the T2 characteristic: ", characteristic.uuid);
+                console.log("Found the mTeamNameCharaceristic characteristic: ", characteristic.uuid);
                 //const data = new Uint8Array([value]);
                 //return characteristic.writeValue(data);
+				UpdateNamesMatch1();
 				return characteristic.writeValue(new TextEncoder().encode(value));
             })
             .then(() => {
                 //latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
+                console.log("Value written to mTeamNameCharaceristic:", value);
             })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
@@ -506,7 +531,27 @@ EbersbrunN:VolleybäreN
             window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
         }
     }
-
+	function handleMatchDataChange_Field2(event){
+	       const newValueReceived = new TextDecoder().decode(event.target.value);
+        console.log("Characteristic value changed: ", newValueReceived);
+		//console.log(uuids);
+		/*if(event.target.value.length() >= 4)
+		{
+			event.target.value
+		}*/
+		const words = newValueReceived.split(',');
+		if(words.length == 0)
+		return;
+		if(words[0] == "0")
+		{
+		var i_team = words[1] + " : " + words[2];
+		value_scores_feld2.innerHTML = i_team;
+		var i_team = words[3] + " : " + words[4];
+		value_sets_feld2.innerHTML = i_team;
+		}
+        //retrievedValue.innerHTML = newValueReceived;
+        //timestampContainer.innerHTML = getDateTime();
+    }
     // Connect to BLE Device and Enable Notifications
     function connectToDevice(){
         console.log('Initializing Bluetooth...');
@@ -529,9 +574,6 @@ EbersbrunN:VolleybäreN
         .then(service => {
             bleServiceFound = service;
             console.log("Service discovered:", service.uuid);
-			var mytch2caracteristic =service.getCharacteristic(mRadioResult_Match2);
-			mytch2caracteristic.addEventListener('characteristicvaluechanged', handleMatchDataChange_Field2);
-			mytch2caracteristic.startNotifications();
             return service.getCharacteristic(sensorCharacteristic);
         })
         .then(characteristic => {
@@ -562,27 +604,7 @@ EbersbrunN:VolleybäreN
 
         connectToDevice();
     }
-	function handleMatchDataChange_Field2(event){
-	       const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
-		//console.log(uuids);
-		/*if(event.target.value.length() >= 4)
-		{
-			event.target.value
-		}*/
-		const words = newValueReceived.split(',');
-		if(words.length == 0)
-		return;
-		if(words[0] == "0")
-		{
-		var i_team = words[1] + " : " + words[2];
-		value_scores_feld2.innerHTML = i_team;
-		var i_team = words[3] + " : " + words[4];
-		value_sets_feld2.innerHTML = i_team;
-		}
-        //retrievedValue.innerHTML = newValueReceived;
-        //timestampContainer.innerHTML = getDateTime();
-    }
+
     function handleCharacteristicChange(event){
         const newValueReceived = new TextDecoder().decode(event.target.value);
         console.log("Characteristic value changed: ", newValueReceived);
@@ -600,6 +622,12 @@ EbersbrunN:VolleybäreN
 		value_scores.innerHTML = i_team;
 		var i_team = words[3] + " : " + words[4];
 		value_sets.innerHTML = i_team;
+		
+		//Match 2
+		var i_team = words[5] + " : " + words[6];
+		value_scores_feld2.innerHTML = i_team;
+		var i_team = words[7] + " : " + words[8];
+		value_sets_feld2.innerHTML = i_team;
 		}
         //retrievedValue.innerHTML = newValueReceived;
         //timestampContainer.innerHTML = getDateTime();

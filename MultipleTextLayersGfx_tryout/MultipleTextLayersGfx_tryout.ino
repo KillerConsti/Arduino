@@ -24,13 +24,13 @@ struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can 
 };
 
 
-
+#define TeamnameLength 14
 struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can be sent.
 {
   uint8_t MatchNum; //we can track 3 matches
   uint8_t type; //1-3 are current matchdata //4-6 are next match data
-  char TeamName1[12];
-  char TeamName2[12];
+  char TeamName1[TeamnameLength];
+  char TeamName2[TeamnameLength];
 };
 
 struct __attribute__((packed)) MatchDataShort  // Any packet up to 32 bytes can be sent.
@@ -51,6 +51,18 @@ NRFLite _radio;
 Commandpackage _radioCmdData;
 MatchDataLong _radio_matchDataLong;
 MatchDataShort _radio_matchDataShort;
+
+enum ShowMode
+{
+  BeachfreundeScreen,
+  CurrentStats,
+  NextStats
+};
+ShowMode mShowMode;
+#define ScreenTimeCurrent 10000
+#define ScreenTimeNext 10000
+uint32_t mScreenTime = 0;
+
 struct RadioChangeEvent
 {
   bool BigDataChange =false;
@@ -64,14 +76,21 @@ struct Match
   int T2_point = 0;
   int T1_sets = 0;
   int T2_sets = 0;
-  char Teamname1[12];
-  char Teamname2[12];
+  char Teamname1[TeamnameLength];
+  char Teamname2[TeamnameLength];
 };
 Match mMatch1;
 Match mMatch2;
 Match mMatch3;
 RadioChangeEvent mRadioChangeEvent;
-
+struct NextMatchs
+{
+  char NextMatchT1[TeamnameLength];
+ char NextMatchT2[TeamnameLength];
+char NextMatchT3[TeamnameLength];
+char NextMatchT4[TeamnameLength];
+};
+NextMatchs mNextMatch;
 
 const static uint8_t RADIO_ID = 1;
 const static uint8_t DESTINATION_RADIO_ID = 0;
@@ -328,6 +347,7 @@ void DrawVolleyball(int x_start,int y_start) {
 }
 void ShowBeachfreundeScreen()
 {
+  mShowMode = ShowMode::BeachfreundeScreen;
   scrollingLayer03.setFont(&FreeSerifBold9pt7b);
   scrollingLayer03.setCursor(10, 12);
   scrollingLayer03.setColor(rgb24(0,255,255));
@@ -343,76 +363,84 @@ void ShowBeachfreundeScreen()
   picture_layer.swapBuffers();
 }
 
-void ShowNextMatchScreen()
-{
-
-}
-
-void WriteLetter(SMLayerGFXMono<rgb24, rgb1, 0> *layer,char Letter)
+bool WriteLetter(SMLayerGFXMono<rgb24, rgb1, 0> *layer,char Letter)
 {
   //look for umlauts
   //notice if we use umlauts we loose one char as it casts a *195*
-
-  Serial.print(" ");
-  Serial.print(Letter);
-  Serial.print(" ");
-  Serial.print(static_cast<int>(Letter));
   int num =static_cast<int>(Letter);
   if(num == 195)
   {
-    return;
+    return false;
   }
   if(num == 164) //ä
   {
     layer->write(0x84);
-    return;
+    return true;
   }
       if(num == 182) //ö
   {
     layer->write(0x94);
-    return;
+    return true;
   }
     if(num == 188) //ü
   {
     layer->write(0x81);
-    return;
+    return true;
   }
   
   layer->print(Letter);
+  return true;
 }
 void ShowCurrentMatchScreen()
 {
+    mShowMode = ShowMode::CurrentStats;
     //write teamnames of match 1
     scrollingLayer03.setColor(rgb24(0, 40, 255));
     scrollingLayer03.setFont(NULL);
      scrollingLayer03.setCursor(2, 2);
-     for(size_t t= 0; t < 12; t++)
+     uint8_t currentlength = 0;
+     for(size_t t= 0; t < TeamnameLength; t++)
      {
-       WriteLetter(&scrollingLayer03,mMatch1.Teamname1[t]);
+       if(WriteLetter(&scrollingLayer03,mMatch1.Teamname1[t]))
+       currentlength++;
+      if(currentlength >= 12)
+      break;
      }
       scrollingLayer03.setCursor(22, 11);
       scrollingLayer03.println("vs.");
       scrollingLayer03.setCursor(2, 22);
-     for(size_t t= 0; t < 12; t++)
+      currentlength = 0;
+     for(size_t t= 0; t < TeamnameLength; t++)
      {
-       WriteLetter(&scrollingLayer03,mMatch1.Teamname2[t]);
+       if(WriteLetter(&scrollingLayer03,mMatch1.Teamname2[t]))
+              currentlength++;
+      if(currentlength >= 12)
+      break;
      }
       scrollingLayer03.swapBuffers(false);
 
       //do likewise for match 2
-
+      teams_match2.setFont(NULL);
         teams_match2.setColor(rgb24(0, 40, 255));
         teams_match2.setCursor(2, 32+2);
-             for(size_t t= 0; t < 12; t++)
+        currentlength = 0;
+             for(size_t t= 0; t < TeamnameLength; t++)
        {
-         WriteLetter(&teams_match2,mMatch2.Teamname1[t]);
+         if(WriteLetter(&teams_match2,mMatch2.Teamname1[t]))
+                currentlength++;
+      if(currentlength >= 12)
+      break;
       }
         teams_match2.setCursor(22, 32+11);
         teams_match2.println("vs.");
         teams_match2.setCursor(2, 32+22);
-       for(size_t t= 0; t < 12; t++)
+        currentlength = 0;
+       for(size_t t= 0; t < TeamnameLength; t++)
        {
-         WriteLetter(&teams_match2,mMatch2.Teamname2[t]);
+         if(WriteLetter(&teams_match2,mMatch2.Teamname2[t]))
+                currentlength++;
+      if(currentlength >= 12)
+      break;
       }
        teams_match2.swapBuffers(false);
 
@@ -423,7 +451,6 @@ void ShowCurrentMatchScreen()
        uint8_t x = mMatch1.T1_sets;
        uint8_t y = mMatch1.T2_sets;
         points_match1.setFont(&FreeSans10pt7b);
-       points_match1.setCursor(75, 15);
        points_match1.setCursor(75, 15);
         if(i > 99)
         {
@@ -445,7 +472,7 @@ void ShowCurrentMatchScreen()
         }
         points_match1.print(j);
         points_match1.swapBuffers(false);
-
+        sets_match1_layer.setColor(rgb24(0, 255, 0));
          sets_match1_layer.setCursor(86, 21);
         sets_match1_layer.print("(");
         sets_match1_layer.print(x);
@@ -494,6 +521,82 @@ void ShowCurrentMatchScreen()
       backgroundLayer.drawRect(0, 0, 128,32, 0xFFE0);
       backgroundLayer.drawRect(0, 32, 128,32, 0xFFE0);
       backgroundLayer.swapBuffers(false);
+}
+
+void DrawNextGameScreen()
+{
+  mShowMode = ShowMode::NextStats;
+    //scrollingLayer03.setColor(rgb24(0, 40, 255));
+    //scrollingLayer03.setFont(NULL);
+      scrollingLayer03.setFont(&FreeSerifBold9pt7b);
+  scrollingLayer03.setColor(rgb24(0,255,255));
+    scrollingLayer03.setCursor(7, 14);
+    scrollingLayer03.print("Nachste Spiele");
+    scrollingLayer03.drawCircle(21, 3 , 1, 0x07FF);
+    scrollingLayer03.drawCircle(26, 3 , 1, 0x07FF);
+    scrollingLayer03.drawLine(0,39,128,39, 0x07FF);
+    scrollingLayer03.drawRect(92, 6, 7,1, 0x0000);
+    Serial.println("DrawNextGameScreen");
+    teams_match2.setCursor(2, 20);
+        uint8_t  currentlength = 0;
+        for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = mNextMatch.NextMatchT1[t];    
+          if(WriteLetter(&teams_match2,currentchar))
+            currentlength++;
+          //if(currentlength >= 12)
+          //break;
+        }
+        Serial.println(mNextMatch.NextMatchT1);
+        Serial.println("is my next match t1");
+         teams_match2.setCursor(2, 30);
+     
+     currentlength = 0;
+             for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = mNextMatch.NextMatchT2[t];    
+          if(WriteLetter(&teams_match2,currentchar))
+            currentlength++;
+          if(currentlength >= 12)
+          break;
+        }
+
+         teams_match2.setCursor(2, 42);
+     
+          currentlength = 0;
+             for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = mNextMatch.NextMatchT3[t];    
+          if(WriteLetter(&teams_match2,currentchar))
+            currentlength++;
+          if(currentlength >= 12)
+          break;
+        }
+
+         teams_match2.setCursor(2, 52);
+    
+         currentlength = 0;
+             for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = mNextMatch.NextMatchT4[t];    
+          if(WriteLetter(&teams_match2,currentchar))
+            currentlength++;
+          if(currentlength >= 12)
+          break;
+        }
+
+     teams_match2.setCursor(90, 24);
+    teams_match2.print("vs.");
+
+         teams_match2.setCursor(90, 46);
+    teams_match2.print("vs.");
+
+
+    teams_match2.swapBuffers(false);
+    scrollingLayer03.swapBuffers(false);
+  backgroundLayer.setColor(rgb24(0,255,255));
+  backgroundLayer.drawRect(0, 0, 128,64, 0xFFE0);
+  backgroundLayer.swapBuffers(false);
 }
 
 void setup() {
@@ -557,9 +660,8 @@ matrix.addLayer(&sets_match2);
     ClearScreen();
   ShowBeachfreundeScreen();
   delay(2000);
-  ClearScreen();
-  ShowCurrentMatchScreen();
-
+          ClearScreen();
+        ShowCurrentMatchScreen();
   attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
 }
 
@@ -598,12 +700,8 @@ bool RecievedMatchDataLong()
     {
       MyMatch = &mMatch3;
     }
-    else if(matchtype < 0)return true; //Handle 4-6
-    if(matchtype < 4)
-    {
       //mRadioChangeEvent.BigDataChange = true;
       ChangeTeamNames(matchtype);
-    }
     return true;
 }
 
@@ -703,6 +801,29 @@ void loop() {
     delay(500);
     return;
   }*/
+  if(millis() >ScreenTimeCurrent && millis() >ScreenTimeNext )
+  {
+  if(mShowMode == ShowMode::CurrentStats)
+  {
+      if(millis()-ScreenTimeCurrent > mScreenTime)
+      {
+        mScreenTime = millis();
+        ClearScreen();
+        DrawNextGameScreen();
+        return;
+      }
+  }
+  else if(mShowMode == ShowMode::NextStats)
+  {
+          if(millis()-ScreenTimeNext > mScreenTime)
+      {
+        mScreenTime = millis();
+        ClearScreen();
+        ShowCurrentMatchScreen();
+        return;
+      }
+  }
+  }
   if(mRadioChangeEvent.LittleDataChange)
   {
       Serial.println("we recieved little data change");
@@ -715,11 +836,14 @@ void loop() {
       //PerformBigDataChange();
       //mRadioChangeEvent.BigDataChange = false;
   }
+
   delay(20);
 }
 
 void PerformLittleDataChange()
 {
+    if(mShowMode != ShowMode::CurrentStats)
+  return;
 //set correct layers to manipulate
     if(mRadioChangeEvent.MatchNum == 1)
     {
@@ -793,47 +917,109 @@ void PerformLittleDataChange()
 }
 void ChangeTeamNames(int MatchNum)
 {
-    Serial.print("Change Team NAmes");
-  mRadioChangeEvent.MatchNum = MatchNum;
-  Serial.println("Matchnum ");
+    Serial.print("Change Team Names ");
+  Serial.println(MatchNum);
   
   int y_Offset = (MatchNum-1) *32;
-  Serial.println(y_Offset);
   SMLayerGFXMono<rgb24,rgb1,kIndexedLayerOptions>* MyLayerTeams= &scrollingLayer03;
   Match* MyMatch = &mMatch1;
-  if(mRadioChangeEvent.MatchNum == 2)
+
+//update Names
+  //we don only update if correct matchnum
+
+  if(MatchNum == 2)
   {
     MyLayerTeams = &teams_match2;
     MyMatch = &mMatch2;
   }
-  MyLayerTeams->fillScreen(0);
-        MyLayerTeams->setCursor(2, y_Offset+2);
-        Serial.print("Teamname 1 ");
-        for(size_t t=0; t < 12; t++)
+  if(MatchNum < 4)
+  {
+          for(size_t t=0; t < TeamnameLength; t++)
         {
           char currentchar = _radio_matchDataLong.TeamName1[t];
           MyMatch->Teamname1[t] = currentchar;
-          Serial.print(currentchar);
-          
-          WriteLetter(MyLayerTeams,currentchar);
+          currentchar = _radio_matchDataLong.TeamName2[t];
+          MyMatch->Teamname2[t] = currentchar;
         }
-        Serial.println("");
+  }
+  else if(MatchNum == 4)
+  {
+          for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = _radio_matchDataLong.TeamName1[t];
+          mNextMatch.NextMatchT1[t] = currentchar;
+          currentchar = _radio_matchDataLong.TeamName2[t];
+          mNextMatch.NextMatchT2[t] = currentchar;
+        }
+        Serial.println("Match 4");
+                Serial.print(mNextMatch.NextMatchT1);
+        Serial.print(" ");
+        Serial.println(mNextMatch.NextMatchT2);
+  }
+  else if (MatchNum == 5)
+  {
+          for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = _radio_matchDataLong.TeamName1[t];
+          mNextMatch.NextMatchT3[t] = currentchar;
+          currentchar = _radio_matchDataLong.TeamName2[t];
+          mNextMatch.NextMatchT4[t] = currentchar;
+        }
+        Serial.println("Match 5");
+        Serial.print(mNextMatch.NextMatchT3);
+        Serial.print(" ");
+        Serial.println(mNextMatch.NextMatchT4);
+  }
+  if(ShowMode::CurrentStats == mShowMode && MatchNum < 4)
+  {
+  //this would update screen
+  MyLayerTeams->fillScreen(0);
+        MyLayerTeams->setCursor(2, y_Offset+2);
+        Serial.print("Teamname 1 ");
+
+        /*     uint8_t currentlength = 0;
+     for(size_t t= 0; t < TeamnameLength; t++)
+     {
+       if(WriteLetter(&scrollingLayer03,mMatch1.Teamname1[t]))
+       currentlength++;
+      if(currentlength >= 12)
+      break;
+     }
+        
+        */
+        uint8_t currentlength = 0;
+        for(size_t t=0; t < TeamnameLength; t++)
+        {
+          char currentchar = _radio_matchDataLong.TeamName1[t];
+          //Serial.print(currentchar);        
+          if(WriteLetter(MyLayerTeams,currentchar))
+       currentlength++;
+      if(currentlength >= 12)
+      break;
+        }
         MyLayerTeams->setCursor(22, y_Offset+11);
         MyLayerTeams->println("vs.");
 
         MyLayerTeams->setCursor(2, y_Offset+22);
         Serial.print("Teamname 2 ");
-                for(size_t t=0; t < 12; t++)
+        currentlength = 0;
+                for(size_t t=0; t < TeamnameLength; t++)
         {
           
           char currentchar = _radio_matchDataLong.TeamName2[t];
-          MyMatch->Teamname2[t] = currentchar;
-          Serial.print(currentchar);
-          WriteLetter(MyLayerTeams,currentchar);
+          if(WriteLetter(MyLayerTeams,currentchar))
+       currentlength++;
+      if(currentlength >= 12)
+      break;
         }
-        Serial.println("");
         
         MyLayerTeams->swapBuffers(false);
-    //finally set scores
+    }
+    else if(ShowMode::NextStats == mShowMode && MatchNum >= 4)
+{
+         //   ClearScreen();
+       // DrawNextGameScreen();
+}
+
 }
 
