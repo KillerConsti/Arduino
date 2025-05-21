@@ -1,18 +1,17 @@
-#include "C:\Users\49151\Documents\Arduino\beachfreunde_anzeige_mit_runddisplay_gc901a_copy_no_blink\settings.h"
+#include "settings.h"
 
 
 
 #include <EEPROM.h>
 #include <Arduino.h>
 #include <NRFLite.h>
-
-#include <C:\Users\49151\Documents\Arduino\beachfreunde_anzeige_mit_runddisplay_gc901a_copy_no_blink\led_anzeige.h>
+#include "led_anzeige.h"
 
 #ifdef UseRoundDisplay
-#include <C:\Users\49151\Documents\Arduino\beachfreunde_anzeige_mit_runddisplay_gc901a_copy_no_blink\Display_GC901A.h>
+#include "Display_GC901A.h"
 RoundDisplay display;
 #else
-#include <C:\Users\49151\Documents\Arduino\beachfreunde_anzeige_mit_runddisplay_gc901a_copy_no_blink\Display_Waveshare_st7789.h>
+#include "Display_Waveshare_st7789.h"
 SquareDisplay display;
 #endif
 
@@ -23,7 +22,7 @@ tm1638 tm;
 LED_MATRIX rgb_mat;
 
 #ifdef USE_ESP32
-#include <C:\Users\49151\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\SPI\src\SPI.h>
+#include <SPI.h>
 /*SPI PINS for Reference
     SCK (SCL)	13 (fest)
     SDA /MOSI	11 (fest)
@@ -144,6 +143,7 @@ typedef struct
   bool ModeChanged =false;
   bool ScoreChanged = false;
   bool SetsChanged = false;
+  bool performedswap = false;
   bool NeedToCareForHistoryLimit = false;
   bool RGBMAT_Update = false;
   bool mUpdateForcedByRadio = false;
@@ -229,11 +229,22 @@ struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes ca
   uint32_t FailedTxCount;
 };
 
+struct __attribute__((packed)) RadioTeamNamePackage  // Any packet up to 32 bytes can be sent.
+{
+  char TeamName1[14];
+  char TeamName2[14];
+};
+
+
+char TeamName1[14];
+char TeamName2[14];
+
 struct __attribute__((packed)) RadioHistoryPacket  // Any packet up to 32 bytes can be sent.
 {
   uint8_t FromRadioId = RADIO_ID;
   VolleyBallHistory myVolleyBallHistory[5];
   uint32_t FailedTxCount;
+  bool WePerformedSwap = false;
 };
 struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can be sent.
 {
@@ -751,6 +762,8 @@ bool CheckInputState()  //return Anything changed?
 
 void ExecuteRemoteCode(uint16_t RemoteCode)
 {
+  Serial.print("Remote code ");
+  Serial.println(RemoteCode);
   //down right button
   if(RemoteCode & 1)
   {
@@ -841,6 +854,7 @@ void ExecuteRemoteCode(uint16_t RemoteCode)
         IgnoreUpdateRightBecauseSwap = true;
         mOldScore.Points1 = -10;
         mOldScore.Points2 = -10;
+        Serial.println("swap by remote");
         SwapVolleyballHistory();
         WhatIsTheReason.ScoreChanged = true;
         WhatIsTheReason.SetsChanged = true;
@@ -920,6 +934,9 @@ void loop() {
       WhatIsTheReason.SetsChanged= false;
       WhatIsTheReason.UpdateHistoryOnDisplay = false;
       SendESP_RADIOINFO();
+      //try out to send radio info
+      mRadioHistoryNeedUpdate = true;
+      return;
     }
     if(!WhatIsTheReason.mUpdateForcedByRadio && mRadioHistoryNeedUpdate)
     {
@@ -937,7 +954,7 @@ void loop() {
     SendRadioInfo(mESP_RADIO);
   } else if (mRadioHistoryNeedUpdate) {
     SendRadioHistoryInfo();
-
+    Serial.println("we checked mRadioHistoryNeedUpdate and called SendRadioHistoryInfo");
   }
   if (PartyMode)
     rgb_mat.DoParty();
@@ -1034,6 +1051,8 @@ void SwapVolleyballHistory() {
     WhatIsTheReason.SetsChanged = true;
     WhatIsTheReason.NeedToCareForHistoryLimit = true;
     WhatIsTheReason.UpdateHistoryOnDisplay = true;
+    Serial.println("SwapVolleyballHistory");
+    WhatIsTheReason.performedswap = true; 
 }
 
 
@@ -1108,6 +1127,7 @@ void SendRadioHistoryInfo() {
       _radioHistoryData.myVolleyBallHistory[mCurrentCounter].Team2 = MyVolleyHistory[t].Team2;
       _radioHistoryData.myVolleyBallHistory[mCurrentCounter].Set = true;
       _radioHistoryData.myVolleyBallHistory[mCurrentCounter].Winner = MyVolleyHistory[t].Winner;
+      
       mCurrentCounter++;
       if (mCurrentCounter >= 5)  //max 5 items- 0...4
         break;
@@ -1120,6 +1140,8 @@ void SendRadioHistoryInfo() {
 
     Serial.print("to ");
     Serial.print(DESTINATION_RADIO_ID);
+    _radioHistoryData.WePerformedSwap = WhatIsTheReason.performedswap;
+    WhatIsTheReason.performedswap = false;
     if (_radio.send(DESTINATION_RADIO_ID, &_radioHistoryData, sizeof(_radioHistoryData)))  // Note how '&' must be placed in front of the variable name.
     {
       Serial.println(" ...Success");
@@ -1334,6 +1356,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
     }
     case Radio_Remote_Commands::Swap:
     {
+      //swap
       //save two values
         int mem1 = right_nmber_value;
         int mem2 = right_set_value;
@@ -1351,6 +1374,9 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
         SendESP_RADIOINFO();
+
+        Serial.println("SwapVolleyballHistory via remote");
+        SwapVolleyballHistory();
         //force non update if not pressed buttons agains
         #ifdef SwapColor
         int zwischen = currentPalette_index_LeftNumber;

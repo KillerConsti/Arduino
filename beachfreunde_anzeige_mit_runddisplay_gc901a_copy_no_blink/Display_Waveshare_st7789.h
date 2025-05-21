@@ -1,10 +1,10 @@
 #pragma once
-#include <C:\Users\49151\Documents\Arduino\beachfreunde_anzeige_mit_runddisplay_gc901a_copy_no_blink\settings.h>
+#include "settings.h"
 #include "Adafruit_GFX.h"
-#include <Adafruit_ST7789.h> // Hardware-specific library for ST7789
-#include <C:\Users\49151\Documents\Arduino\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold12pt7b.h>
-#include <C:\Users\49151\Documents\Arduino\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold24pt7b.h>
-#include <C:\Users\49151\Documents\Arduino\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold18pt7b.h>
+#include "Adafruit_ST7789.h" // Hardware-specific library for ST7789
+#include "..\..\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold12pt7b.h"
+#include "..\..\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold24pt7b.h"
+#include "..\..\libraries\Adafruit_GFX_Library\Fonts\FreeSansBold18pt7b.h"
 
 
 class SquareDisplay {

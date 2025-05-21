@@ -434,6 +434,7 @@ class BLEInterface
 void BleInterface();
 void initDevice();
 void SendScroreToWebBLE(String Input);
+void SendSwapTeamsToWebBle();
 void StartAdvertising();
 };
 
@@ -519,6 +520,11 @@ TeamNameCharacteristic_Field2->addDescriptor(new BLE2902());
   pAdvertising->setScanResponse(false);
   pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
   BLEDevice::startAdvertising();
+}
+
+void SendSwapTeamsToWebBle()
+{
+  //copy from sendScore to webble but send a 1 instead of a 0 as first digit
 }
 
 void BLEInterface::SendScroreToWebBLE(String Input)

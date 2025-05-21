@@ -53,6 +53,9 @@ bool mUpdateScreenOne = false;
 bool mUpdateScreenTwo = false;
 bool mNeedToUpdateNextMatchField1 = false;
 bool mNeedToUpdateNextMatchField2 = false;
+
+bool Match1SwappedTeams = false;
+bool Match2SwappedTeams = false;
 //Radio
 
 struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can be sent.
@@ -107,6 +110,7 @@ struct __attribute__((packed)) RadioHistoryPacket  // Any packet up to 32 bytes 
   uint8_t FromRadioId;
   VolleyBallHistory myVolleyBallHistory[5];
   uint32_t FailedTxCount;
+  bool WePerformedSwap = false;
 };
 
 //ble 

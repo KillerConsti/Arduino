@@ -458,7 +458,20 @@ void loop() {
     uint8_t t1_won = 0;
     uint8_t t2_won = 0;
     _radio.readData(&_radioHistoryData);
-    uint8_t sender = _radioData.FromRadioId - 1;
+   
+    uint8_t sender = _radioHistoryData.FromRadioId - 1;
+    if(sender == 0 && _radioHistoryData.WePerformedSwap)
+    {
+      Serial.print("must swap teamnames m1");
+      Match1SwappedTeams = true;
+
+    }
+    else     if(sender == 0 && _radioHistoryData.WePerformedSwap)
+    {
+      Serial.print("must swap teamnames m2");
+      Match2SwappedTeams = true;
+
+    }
     Serial.println("Verlauf:");
     if (_radioHistoryData.myVolleyBallHistory[0].Set == false) {
       Serial.print("Keine Sätze gespielt");
@@ -575,6 +588,11 @@ void UpdateHistory(VolleyBallHistory TheArray[], int n, int sender) {
   mDisplay->UpdateHistory(TheArray,n,sender);
 }
 void SetNewScore(int T1, int T2, int S1, int S2,int sender) {
+ mDisplay->SetNewScore(T1,T2,S1,S2,sender);
+}
+
+void SetNewScoreAndSwapTeamNamesLED(int T1, int T2, int S1, int S2,int sender) 
+{
  mDisplay->SetNewScore(T1,T2,S1,S2,sender);
 }
 
