@@ -258,6 +258,7 @@ struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can 
 };
 //we wont use delay
 bool mRadioNeedUpdateScore = false;
+bool mRadioRemoteNeedUpdateScore = false;
 bool mRadioHistoryNeedUpdate = false;
 bool mNeedToSetNewNumber = false;
 bool mNeedToSetNewNumberInformRadio = false;
@@ -403,12 +404,14 @@ void SetNewNumberWasRequested()  //Set Number but only on event
   if (InformRadio && mNewScore.Points1 != mOldScore.Points1 || mNewScore.Set1 != mOldScore.Set1 || mNewScore.Points2 != mOldScore.Points2 || mNewScore.Set2 != mOldScore.Set2) {
     //Inform RadioSystem
     mRadioNeedUpdateScore = true;
+    mRadioRemoteNeedUpdateScore = true;
   }
 
   
   //left side
   if (mNewScore.UpdateColorLeft || mNewScore.Points1 != mOldScore.Points1) {
-    mRadioNeedUpdateScore = true;
+        mRadioNeedUpdateScore = true;
+    mRadioRemoteNeedUpdateScore = true;
     rgb_mat.SetNewNumberLeft(left_number_value,currentPalette_index_LeftNumber);
   }
 
@@ -904,7 +907,8 @@ void loop() {
   }*/
   if(CheckInputState())
   {
-      mRadioNeedUpdateScore = true;
+          mRadioNeedUpdateScore = true;
+    mRadioRemoteNeedUpdateScore = true;
       Serial.println("need to update radio");
   }
   if(mNeedToSetNewNumber)
@@ -978,12 +982,19 @@ void loop() {
     WhatIsTheReason.mUpdateForcedByRadio = false;
 
   } 
-  else if (mRadioNeedUpdateScore)  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
+  else if (mRadioNeedUpdateScore && mRadioTime < millis())  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
   {
     SendRadioInfo(0);
-    SendRadioInfo(mESP_RADIO);
+    mRadioNeedUpdateScore = false;
+    
     return;
-  } else if (mRadioHistoryNeedUpdate) {
+  } 
+  else if(mRadioRemoteNeedUpdateScore && mRadioTime < millis())
+  {
+    SendRadioInfo(mESP_RADIO);
+    mRadioRemoteNeedUpdateScore = false;
+  }
+    else if (mRadioHistoryNeedUpdate) {
     SendRadioHistoryInfo();
     Serial.println("we checked mRadioHistoryNeedUpdate and called SendRadioHistoryInfo");
   }
@@ -1128,15 +1139,15 @@ void DrehschalterDreh1() {
 }
 
 bool SendRadioInfo(int TargetRadioId) {
-  if (mRadioTime < millis()) {
-    mRadioNeedUpdateScore = false;
-    mRadioTime = millis() + 100;
+  //if (mRadioTime < millis()) 
+  {
+    mRadioTime = millis() + 50;
     _radioScoreData.T1_Score = left_number_value;
     _radioScoreData.T2_Score = right_nmber_value;
     _radioScoreData.T1_Sets = left_set_value;
     _radioScoreData.T2_Sets = right_set_value;
     //_radioScoreData.OnTimeMillis = millis();
-    Serial.print("Radio: Sending Score to");
+    Serial.print("Radio: Sending Score to ");
     Serial.print(TargetRadioId);
     // By default, 'send' transmits data and waits for an acknowledgement.  If no acknowledgement is received,
     // it will try again up to 16 times.  This retry logic is built into the radio hardware itself, so it is very fast.
@@ -1164,7 +1175,7 @@ void SendRadioHistoryInfo() {
   VolleyBallHistory RadioVolleyBallHistory[5];
   if (mRadioTime < millis()) {
     mRadioHistoryNeedUpdate = false;
-    mRadioTime = millis() + 100;
+    mRadioTime = millis() + 20;
     int mCurrentCounter = 0;
     for (size_t t = 0; t < 10; t++) {
       if (MyVolleyHistory[t].Set == false)
@@ -1231,6 +1242,7 @@ void ReadCommandData()
   if (_radioCommandData.CommandId == 0)  //we request an update on History and Score on Radio Device
   {
     mRadioNeedUpdateScore = true;
+    mRadioRemoteNeedUpdateScore = true;
     mRadioHistoryNeedUpdate = true;
     return;  //do it next tick - when we are idel
   } else if (_radioCommandData.CommandId == 1) {
@@ -1414,7 +1426,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         right_set_value = left_set_value;
         left_number_value = mem1;
         left_set_value = mem2;
-        //this is to make it unable to increase value after releasing buttons
+        WhatIsTheReason.mUpdateForcedByRadio = true;
         IgnoreUpdateLeftBecauseSwap = true;
         IgnoreUpdateRightBecauseSwap = true;
         mOldScore.Points1 = -10;
@@ -1422,10 +1434,11 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         WhatIsTheReason.ScoreChanged = true;
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
-        SendESP_RADIOINFO();
-
+                  mRadioNeedUpdateScore = true;
+    mRadioRemoteNeedUpdateScore = true;
         //Serial.println("SwapVolleyballHistory via remote");
         SwapVolleyballHistory();
+        SendESP_RADIOINFO();
         //force non update if not pressed buttons agains
         #ifdef SwapColor
         int zwischen = currentPalette_index_LeftNumber;
