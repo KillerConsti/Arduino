@@ -40,14 +40,14 @@ int b_links_oben = 25;
 int b_links_unten = 26;
 const static uint8_t PIN_RADIO_CE = 2;
 const static uint8_t PIN_RADIO_CSN = 15;
-
+const static uint8_t PIN_RADIO_INTERRUPT = 3; //Need to set this for esp32
 #else /* UNO */
 #include "SPI.h"
 #define DATA_PIN 1
 #define DATA2_PIN 0
-//drehschalter
+//drehschalter <-> noticed that we changed DT for interrupt reason
 int CLK = 2;
-int DT = 3;
+int DT = 17;
 int SW = 4;
 //buttons
 #ifdef SwapWiringButtons
@@ -67,6 +67,7 @@ int b_links_unten = 5;
 //funker
 const static uint8_t PIN_RADIO_CE = 9;
 const static uint8_t PIN_RADIO_CSN = 10;
+const static uint8_t PIN_RADIO_INTERRUPT = 3; //New interrupt <-> we changed it with Drehknopf
 #endif
 
 int left_number_value;
@@ -148,6 +149,7 @@ typedef struct
   bool RGBMAT_Update = false;
   bool mUpdateForcedByRadio = false;
   bool UpdateHistoryOnDisplay =false;
+ 
 } ReasonForUpdate;
 ReasonForUpdate WhatIsTheReason;
 int tries = 0;
@@ -257,6 +259,8 @@ struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can 
 //we wont use delay
 bool mRadioNeedUpdateScore = false;
 bool mRadioHistoryNeedUpdate = false;
+bool mNeedToSetNewNumber = false;
+bool mNeedToSetNewNumberInformRadio = false;
 unsigned long mRadioTime = 0;
 NRFLite _radio;
 RadioScorePacket _radioScoreData;
@@ -290,7 +294,7 @@ enum Radio_Remote_Commands
 uint8_t mESP_RADIO = RADIO +3;
 Radio_Remote_Commandpackage mRemoteCommandPackage;
 //ESP REMOTE END
-
+volatile bool mNeedToReadRadioData = false;
 /**/
 void setup() {
   Serial.begin(9600);
@@ -363,6 +367,8 @@ void setup() {
   //Vorteil keine Falschen Richtungen mehr
   attachInterrupt(digitalPinToInterrupt(CLK), DrehschalterDreh1, CHANGE);
   //init Radio
+  //pinMode(PIN_RADIO_INTERRUPT, INPUT);
+
   if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
@@ -370,11 +376,20 @@ void setup() {
   }
 
   _radioScoreData.FromRadioId = RADIO_ID;
+  //pinMode(PIN_RADIO_INTERRUPT, INPUT);
+  //attachInterrupt(digitalPinToInterrupt(PIN_RADIO_INTERRUPT),RadioMsgInterrupt, FALLING);
 }
 
 
-void SetNewNumber(bool InformRadio)  //Set Number but only on event
+void SetNewNumber(bool InformRadio)
 {
+   mNeedToSetNewNumber = true;
+ mNeedToSetNewNumberInformRadio = InformRadio;
+}
+void SetNewNumberWasRequested()  //Set Number but only on event
+{
+  mNeedToSetNewNumber = false;
+  bool InformRadio = mNeedToSetNewNumberInformRadio;
   //updates are heavy and block input so try to make less heavy updates by a lot if's
   //do specific checks which areas need inputs
   /*Score mNewScore;
@@ -411,6 +426,7 @@ void SetNewNumber(bool InformRadio)  //Set Number but only on event
   mOldScore = mNewScore;
   rgb_mat.Show();
   tm.SetNewScore(mNewScore.Points1,mNewScore.Points2,mNewScore.Set1,mNewScore.Set2);
+
 }
 
 void ModifyColor(bool GoUP) {
@@ -873,10 +889,27 @@ void loop() {
   CurrentTime = millis() - StartTime;
   //Any Button or other input event?
   /*bool UpdateNeeded = *///CheckInputState();
+  if(_radio.hasData())
+  {
+      PerformRadioCommand();
+      Serial.print("we have Data?");
+      return;
+    
+  }
+ /*) if(mNeedToReadRadioData)
+  {
+    Serial.print("mNeedToReadRadioData");
+    mNeedToReadRadioData = false;
+    PerformRadioCommand();
+  }*/
   if(CheckInputState())
   {
       mRadioNeedUpdateScore = true;
       Serial.println("need to update radio");
+  }
+  if(mNeedToSetNewNumber)
+  {
+    SetNewNumberWasRequested();
   }
   //set numbers ... but only if input changed?
   //can be messy because we have a blink animation
@@ -906,7 +939,7 @@ void loop() {
       Serial.print(WhatIsTheReason.SetsChanged);
       Serial.print(WhatIsTheReason.UpdateHistoryOnDisplay);
     }
-    else if(WhatIsTheReason.mUpdateForcedByRadio)
+    if(WhatIsTheReason.mUpdateForcedByRadio)
     {
       Serial.println("forced by radio");
     }
@@ -944,14 +977,12 @@ void loop() {
     }
     WhatIsTheReason.mUpdateForcedByRadio = false;
 
-  } else if (_radio.hasData() > 0)  //we got a Cmd from CmdCenter over Radio
-  {
-    Serial.println("radio has data");
-    PerformRadioCommand();
-  } else if (mRadioNeedUpdateScore)  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
+  } 
+  else if (mRadioNeedUpdateScore)  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
   {
     SendRadioInfo(0);
     SendRadioInfo(mESP_RADIO);
+    return;
   } else if (mRadioHistoryNeedUpdate) {
     SendRadioHistoryInfo();
     Serial.println("we checked mRadioHistoryNeedUpdate and called SendRadioHistoryInfo");
@@ -974,8 +1005,24 @@ void loop() {
 }
 
 
+void RadioMsgInterrupt()
+{
+    // Ask the radio what caused the interrupt.  This also resets the IRQ pin on the
+    // radio so a new interrupt can be triggered.
 
+    uint8_t txOk, txFail, rxReady;
+    _radio.whatHappened(txOk, txFail, rxReady);
 
+    // txOk = the radio successfully transmitted data.
+    // txFail = the radio failed to transmit data.
+    // rxReady = the radio received data.
+    if (rxReady)
+    {
+        //_dataWasReceived = true;
+        //Serial.println("we recieved data");
+        mNeedToReadRadioData = true;
+    }
+}
 
 
 
@@ -1007,8 +1054,8 @@ void HandleSetFinished() {
   Winner = 1;
   else if (left_number_value < right_nmber_value)
   Winner =2;
-  Serial.print("Winner is");
-  Serial.println(Winner);
+  //Serial.print("Winner is");
+  //Serial.println(Winner);
   int SetCounter = 0;
   for(size_t t=0; t < 10; t++)
   {
@@ -1154,10 +1201,11 @@ void SendRadioHistoryInfo() {
 
 
 void PerformRadioCommand() {
+    //uint8_t packetSize = _radio.hasDataISR();
     uint8_t packetSize = _radio.hasData();
   if (packetSize == sizeof(Radio_Remote_Commandpackage)) {
      _radio.readData(&mRemoteCommandPackage);
-     Serial.println("Remote package recieved");
+     //Serial.println("Remote package recieved");
     OnRecieve_REMOTE_CONTROL_DATA();
     return;
   }
@@ -1178,7 +1226,7 @@ void PerformRadioCommand() {
 
 void ReadCommandData()
 {
-  Serial.print("Cmd arrived: ");
+  //Serial.print("Cmd arrived: ");
   Serial.println(_radioCommandData.CommandId);
   if (_radioCommandData.CommandId == 0)  //we request an update on History and Score on Radio Device
   {
@@ -1194,10 +1242,10 @@ void ReadCommandData()
     mNewScore.Points2 = right_nmber_value;
     mNewScore.Set1 = left_set_value;
     mNewScore.Set1 = right_set_value;
-    Serial.println(left_number_value);
+    /*Serial.println(left_number_value);
     Serial.println(right_nmber_value);
     Serial.println(left_set_value);
-    Serial.println(right_set_value);
+    Serial.println(right_set_value);*/
     WhatIsTheReason.mUpdateForcedByRadio = true;
     //clever=
     if (mNewScore.Points1 != mOldScore.Points1 || mNewScore.Points2 != mOldScore.Points2)
@@ -1225,13 +1273,13 @@ void ReadCommandData()
       mOldScore.Points2 = -15;
       mOldScore.Set1 = -1;
       mOldScore.Set2 = -1;
-      Serial.println("Hard Reset requested by Radio");
+      //Serial.println("Hard Reset requested by Radio");
     } else {
       mOldScore.Points1 = -10;
       mOldScore.Points2 = -10;
       left_number_value = 0;
       right_nmber_value = 0;
-      Serial.println("Point Reset requested by Radio");
+      //Serial.println("Point Reset requested by Radio");
       ButtonTimeReset = millis() + 100000;  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
     }
   } else if (_radioCommandData.CommandId == 3)  //set history
@@ -1304,16 +1352,17 @@ void OnRecieve_REMOTE_CONTROL_DATA()
   //mRemoteCommandPackage
   if(mRemoteCommandPackage.FromRadioId != mESP_RADIO)
   return;
-  Serial.println("recieved package from our remote");
+  //Serial.println("recieved package from our remote");
   switch (mRemoteCommandPackage.CommandId)
   {
     case Radio_Remote_Commands::Connect:
     {
       //just send score back
-      Serial.print("Connect (send radio info)");
-      WhatIsTheReason.ScoreChanged = true;
-      WhatIsTheReason.mUpdateForcedByRadio = true;
-      SendESP_RADIOINFO();
+      //Serial.print("Connect (send radio info)");
+      //WhatIsTheReason.ScoreChanged = true;
+      //WhatIsTheReason.mUpdateForcedByRadio = true;
+      Serial.println("send connect msg");
+      mRadioNeedUpdateScore = true;
       return;
     }
     case Radio_Remote_Commands::PlusT1:
@@ -1322,7 +1371,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
       
       WhatIsTheReason.ScoreChanged = true;
       WhatIsTheReason.mUpdateForcedByRadio = true;
-      Serial.print("PlusT1 (send radio info)");
+      //Serial.print("PlusT1 (send radio info)");
       SendESP_RADIOINFO();
       return;
     }
@@ -1333,7 +1382,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
       WhatIsTheReason.ScoreChanged = true;
       WhatIsTheReason.mUpdateForcedByRadio = true;
       SendESP_RADIOINFO();
-      Serial.print("MinusT1 (send radio info)");
+      //Serial.print("MinusT1 (send radio info)");
       return;
     }
         case Radio_Remote_Commands::PlusT2:
@@ -1342,7 +1391,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
       WhatIsTheReason.ScoreChanged = true;
       WhatIsTheReason.mUpdateForcedByRadio = true;
       SendESP_RADIOINFO();
-      Serial.print("PlusT2 (send radio info)");
+      //Serial.print("PlusT2 (send radio info)");
       return;
     }
     case Radio_Remote_Commands::MinusT2:
@@ -1351,7 +1400,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
       WhatIsTheReason.ScoreChanged = true;
       WhatIsTheReason.mUpdateForcedByRadio = true;
       SendESP_RADIOINFO();
-      Serial.print("MinusT2 (send radio info)");
+      //Serial.print("MinusT2 (send radio info)");
       return;
     }
     case Radio_Remote_Commands::Swap:
@@ -1375,7 +1424,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
         SendESP_RADIOINFO();
 
-        Serial.println("SwapVolleyballHistory via remote");
+        //Serial.println("SwapVolleyballHistory via remote");
         SwapVolleyballHistory();
         //force non update if not pressed buttons agains
         #ifdef SwapColor
@@ -1401,14 +1450,14 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         mOldScore.Points2 = -15;
         mOldScore.Set1 = -1;
         mOldScore.Set2 = -1;
-        Serial.println("Hard Reset");
+        //Serial.println("Hard Reset");
       } else {
         mOldScore.Points1 = -10;
         mOldScore.Points2 = -10;
         left_number_value = 0;
         right_nmber_value = 0;
         WhatIsTheReason.ScoreChanged = true;
-        Serial.println("Point Reset");
+        //Serial.println("Point Reset");
       }
       return;
     }

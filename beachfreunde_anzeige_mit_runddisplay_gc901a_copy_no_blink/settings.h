@@ -24,7 +24,7 @@
 //Display Pinout
 
 #ifdef USE_ESP32
-#include <C:\Users\49151\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\SPI\src\SPI.h>
+#include <SPI.h>
 /*SPI PINS for Reference
     SCK (SCL)	13 (fest)
     SDA /MOSI	11 (fest)

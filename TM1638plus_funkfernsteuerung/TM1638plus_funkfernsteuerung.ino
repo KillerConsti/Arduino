@@ -48,7 +48,8 @@ const static uint8_t PIN_RADIO_CSN = 15;
 const static uint8_t PIN_RADIO_MOSI = 23;
 const static uint8_t PIN_RADIO_MISO = 19;
 const static uint8_t PIN_RADIO_SCK = 18;
-
+volatile bool _dataWasReceived = false;
+const static uint8_t PIN_RADIO_IRQ = 17;
 //Remotes are 4-6 which targeting 1-3 
 //0 is general remote control (with ble server)
 
@@ -204,6 +205,25 @@ void GoIntONextChannel()
 }
 
 
+void radioInterrupt()
+{
+    // Ask the radio what caused the interrupt.  This also resets the IRQ pin on the
+    // radio so a new interrupt can be triggered.
+
+    uint8_t txOk, txFail, rxReady;
+    _radio.whatHappened(txOk, txFail, rxReady);
+
+    // txOk = the radio successfully transmitted data.
+    // txFail = the radio failed to transmit data.
+    // rxReady = the radio received data.
+
+    if (rxReady)
+    {
+        _dataWasReceived = true;
+    }
+}
+
+
 void setup() {
   Serial.begin(9600);
   Serial.println("we start here");
@@ -217,76 +237,42 @@ void setup() {
     //while (1)
       ;  // Wait here forever.
   }
+  //pinMode(PIN_RADIO_IRQ,INPUT);
+  //attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
+  Serial.print("we interrupt at ");
+  Serial.println(digitalPinToInterrupt(PIN_RADIO_IRQ));
   //TODO Implent EEPROM func
   LoadRadioIdsFromEEPROM();
-
-  //ota
-  /*WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    network_tries++;
-    if(network_tries > 2)
-    {
-    Serial.println("No network connection");
-    break;
-    }
-    else
-    delay(200);
-  }*/
-  /*if(network_tries < 3)
-  connected = true;
-
- ArduinoOTA
-    .onStart([]() {
-      String type;
-      if (ArduinoOTA.getCommand() == U_FLASH) {
-        type = "sketch";
-      } else {  // U_SPIFFS
-        type = "filesystem";
-      }
-
-      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-      Serial.println("Start updating " + type);
-    })
-    .onEnd([]() {
-      Serial.println("\nEnd");
-    })
-    .onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    })
-    .onError([](ota_error_t error) {
-      Serial.printf("Error[%u]: ", error);
-      if (error == OTA_AUTH_ERROR) {
-        Serial.println("Auth Failed");
-      } else if (error == OTA_BEGIN_ERROR) {
-        Serial.println("Begin Failed");
-      } else if (error == OTA_CONNECT_ERROR) {
-        Serial.println("Connect Failed");
-      } else if (error == OTA_RECEIVE_ERROR) {
-        Serial.println("Receive Failed");
-      } else if (error == OTA_END_ERROR) {
-        Serial.println("End Failed");
-      }
-    });
-
-  ArduinoOTA.begin();
-
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());*/
+  _radio.startRx();
 }
 
 void loop() {
   //if(connected)
 //ArduinoOTA.handle();
-
+/*if(_radio.hasData())
+{
+  Serial.println("we recieved data");
+}*/
   ListenToRadioMessages();
+  /*if(_dataWasReceived)
+  {
+    Serial.println("we recieved data");
+    _dataWasReceived = false;
+    ListenToRadioMessages();
+    return;
+  }*/
     if(NoData && mTimeLastRadioConnectMessageWasSent +1000 < millis()) //do wait until we got a msg
   {
       //this is a lil hack
-    T1Point(1);
-    T1Point(-1);
+   _radioCmdData.CommandId = Commands::Connect;
+   _radioCmdData.FromRadioId = mOurRadioID;
+   _radioCmdData.CommandArg1 = 0;
+    if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
+  {
+      Serial.println("Connect...Success");
+    } else {
+      //Serial.println("T1Point...Failed");
+    }
     mTimeLastRadioConnectMessageWasSent = millis();
     return;
   }
