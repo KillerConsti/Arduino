@@ -1374,7 +1374,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
       //WhatIsTheReason.ScoreChanged = true;
       //WhatIsTheReason.mUpdateForcedByRadio = true;
       Serial.println("send connect msg");
-      mRadioNeedUpdateScore = true;
+      mRadioRemoteNeedUpdateScore = true;
       return;
     }
     case Radio_Remote_Commands::PlusT1:

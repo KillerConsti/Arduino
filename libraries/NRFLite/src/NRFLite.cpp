@@ -453,6 +453,14 @@ uint8_t NRFLite::initRadio(uint8_t radioId, Bitrates bitrate, uint8_t channel)
     return success;
 }
 
+uint8_t NRFLite::ChangeRadioId(uint8_t radioId)
+{
+	    uint8_t address[5] = { ADDRESS_PREFIX[0], ADDRESS_PREFIX[1], ADDRESS_PREFIX[2], ADDRESS_PREFIX[3], radioId };
+		writeRegister(RX_ADDR_P1, &address, 5);
+		uint8_t success = startRx();
+		return success;
+}	
+
 void NRFLite::prepForTx(uint8_t toRadioId, SendType sendType)
 {
     if (_lastToRadioId != toRadioId)

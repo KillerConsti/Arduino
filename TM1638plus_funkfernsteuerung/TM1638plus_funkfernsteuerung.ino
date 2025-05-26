@@ -42,7 +42,6 @@ TM1638plus_Model2 tm(STROBE_TM, CLOCK_TM , DIO_TM, swap_nibbles, high_freq);
 //tft in user_setup.h
 
 //2 ID and PINS
-const static uint8_t RADIO_ID = 0;
 const static uint8_t PIN_RADIO_CE = 2;
 const static uint8_t PIN_RADIO_CSN = 15;
 const static uint8_t PIN_RADIO_MOSI = 23;
@@ -200,8 +199,11 @@ void GoIntONextChannel()
   delay(2000);
   NeedConnection();
   delay(500);
-    T1Point(1);
-    T1Point(-1);
+   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+    Serial.println("Cannot communicate with radio");
+    //while (1)
+      ;  // Wait here forever.
+  }
 }
 
 
@@ -231,19 +233,19 @@ void setup() {
  tm.displayBegin();
  NeedConnection();
 
- //init radio
-   if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
-    Serial.println("Cannot communicate with radio");
-    //while (1)
-      ;  // Wait here forever.
-  }
+
   //pinMode(PIN_RADIO_IRQ,INPUT);
   //attachInterrupt(digitalPinToInterrupt(PIN_RADIO_IRQ), radioInterrupt, FALLING);
   Serial.print("we interrupt at ");
   Serial.println(digitalPinToInterrupt(PIN_RADIO_IRQ));
   //TODO Implent EEPROM func
   LoadRadioIdsFromEEPROM();
-  _radio.startRx();
+   //init radio
+   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+    Serial.println("Cannot communicate with radio");
+    //while (1)
+      ;  // Wait here forever.
+  }
 }
 
 void loop() {
@@ -467,6 +469,7 @@ void T2Point(int point)
 void NeedConnection()
 {
   tm.DisplayStr("NO  DATA");
+  NoData = true;
 }
 void UpdateDisplay()
 {

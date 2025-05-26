@@ -76,7 +76,7 @@ class NRFLite {
     uint8_t startRx();
     void startSend(uint8_t toRadioId, void *data, uint8_t length, SendType sendType = REQUIRE_ACK); 
     void whatHappened(uint8_t &txOk, uint8_t &txFail, uint8_t &rxReady);
-    
+    uint8_t ChangeRadioId(uint8_t radioId);
   private:
 
     constexpr static uint8_t ADDRESS_PREFIX[4] = { 1, 2, 3, 4 }; // 1st 4 bytes of addresses, 5th byte will be RadioId.
