@@ -19,7 +19,7 @@
 //Auswahl Display (rund oder 2" eckig)
 #define UseRoundDisplay
 
-
+#define TeamnameLength 14
 /**************************Technische Sachen******************/
 //Display Pinout
 

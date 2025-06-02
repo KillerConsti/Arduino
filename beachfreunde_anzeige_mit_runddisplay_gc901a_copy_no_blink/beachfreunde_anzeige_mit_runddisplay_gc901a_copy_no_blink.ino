@@ -6,7 +6,6 @@
 #include <Arduino.h>
 #include <NRFLite.h>
 #include "led_anzeige.h"
-
 #ifdef UseRoundDisplay
 #include "Display_GC901A.h"
 RoundDisplay display;
@@ -63,7 +62,8 @@ int b_links_oben = 6;
 int b_links_unten = 5;
 #endif
 
-
+char TeamName1[14];
+char TeamName2[14];
 //funker
 const static uint8_t PIN_RADIO_CE = 9;
 const static uint8_t PIN_RADIO_CSN = 10;
@@ -231,15 +231,14 @@ struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes ca
   uint32_t FailedTxCount;
 };
 
-struct __attribute__((packed)) RadioTeamNamePackage  // Any packet up to 32 bytes can be sent.
+struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can be sent.
 {
-  char TeamName1[14];
-  char TeamName2[14];
+  uint8_t MatchNum; //we can track 3 matches <-> unused on scoreboard
+  uint8_t type; //1-3 are current matchdata //4-6 are next match data <-> dont need to handle on scoreboard
+  char TeamName1[TeamnameLength];
+  char TeamName2[TeamnameLength];
 };
-
-
-char TeamName1[14];
-char TeamName2[14];
+MatchDataLong mMatchDataLong;
 
 struct __attribute__((packed)) RadioHistoryPacket  // Any packet up to 32 bytes can be sent.
 {
@@ -714,7 +713,7 @@ bool CheckInputState()  //return Anything changed?
         AnythingChanged = true;
         ButtonTimeReset = millis() + 100000;  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
         ClearAllVolleyBallHistory();
-        display.ClearAndUpdateHistory();
+        display.ClearAndUpdateHistory(TeamName1,TeamName2);
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
         mOldScore.Points1 = -15;
@@ -841,7 +840,7 @@ void ExecuteRemoteCode(uint16_t RemoteCode)
         left_set_value = 0;
         ModifyButtonState = 0;
         ClearAllVolleyBallHistory();
-        display.ClearAndUpdateHistory();
+        display.ClearAndUpdateHistory(TeamName1,TeamName2);
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
         mOldScore.Points1 = -15;
@@ -965,7 +964,7 @@ void loop() {
     }
     if(WhatIsTheReason.SetsChanged || WhatIsTheReason.UpdateHistoryOnDisplay)
     {
-      display.DrawOnDisplay(MyVolleyHistory,left_set_value,right_set_value,left_number_value,right_nmber_value,true,DoNotUpdateHistoryOnDisplay);
+      display.DrawOnDisplay(MyVolleyHistory,left_set_value,right_set_value,left_number_value,right_nmber_value,true,DoNotUpdateHistoryOnDisplay,TeamName1,TeamName2);
       Serial.println("draw on display done");
       WhatIsTheReason.NeedToCareForHistoryLimit = false;
       WhatIsTheReason.SetsChanged= false;
@@ -1110,6 +1109,7 @@ void SwapVolleyballHistory() {
     WhatIsTheReason.NeedToCareForHistoryLimit = true;
     WhatIsTheReason.UpdateHistoryOnDisplay = true;
     Serial.println("SwapVolleyballHistory");
+    SwapTeamNames();
     WhatIsTheReason.performedswap = true; 
 }
 
@@ -1209,7 +1209,28 @@ void SendRadioHistoryInfo() {
     }
   }
 }
+void ReadTeamNameData()
+{
+  //Serial.println("recieved Teamnames")
+  //Serial.print(mMatchDataLong.TeamName1);
+  //Serial.println(" vs. ");
+  //Serial.print(mMatchDataLong.TeamName2);
+  for(size_t t= 0; t < 14; t++)
+  {
+    Serial.print(mMatchDataLong.TeamName1[t]);
+    TeamName1[t] = mMatchDataLong.TeamName1[t];
 
+  }
+
+    for(size_t t= 0; t < 14; t++)
+  {
+    Serial.print(mMatchDataLong.TeamName2[t]);
+    TeamName2[t] = mMatchDataLong.TeamName2[t];
+    
+  }
+      WhatIsTheReason.NeedToCareForHistoryLimit = true;
+    WhatIsTheReason.UpdateHistoryOnDisplay = true;
+}
 
 void PerformRadioCommand() {
     //uint8_t packetSize = _radio.hasDataISR();
@@ -1223,9 +1244,16 @@ void PerformRadioCommand() {
   
   else if(packetSize== sizeof(Commandpackage))
   {
+    
     _radio.readData(&_radioCommandData);
     //go on in this function
      ReadCommandData();
+  }
+  else if (packetSize== sizeof(MatchDataLong))
+  {
+    Serial.println("recieved Matchdata long");
+    _radio.readData(&mMatchDataLong);
+    ReadTeamNameData();
   }
   else
   {
@@ -1333,11 +1361,11 @@ void ReadCommandData()
     //Now Update
     //do not inform radio as data came from Radio
     if (left_set_value == WinT1 && right_set_value == WinT2) {
-      display.UpdateHistory(MyVolleyHistory);
+      display.UpdateHistory(MyVolleyHistory,TeamName1,TeamName2);
     } else {
       left_set_value = WinT1;
       right_set_value = WinT2;
-      display.UpdateHistory(MyVolleyHistory);
+      display.UpdateHistory(MyVolleyHistory,TeamName1,TeamName2);
       display.UpdateSetCounter(left_set_value,right_set_value);
       SetNewNumber(false);
     }
@@ -1456,7 +1484,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         left_set_value = 0;
         ModifyButtonState = 0;
         ClearAllVolleyBallHistory();
-        display.ClearAndUpdateHistory();
+        display.ClearAndUpdateHistory(TeamName1,TeamName2);
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
         mOldScore.Points1 = -15;
@@ -1487,4 +1515,33 @@ void SendESP_RADIOINFO()
 {
         mForceUpdateESPRadio = true;
         tries = 0;
+}
+
+void SwapTeamNames()
+{
+  char Mem[14];
+  for(size_t t= 0; t < 14;t++)
+  {
+    Mem[t] = TeamName1[t];
+    TeamName1[t] = TeamName2[t]; 
+    TeamName2[t] = Mem[t];
+    mMatchDataLong.TeamName1[t] = TeamName1[t];
+    mMatchDataLong.TeamName2[t] = TeamName2[t];
+    mMatchDataLong.MatchNum = 0;
+    mMatchDataLong.type = RADIO_ID;
+  }
+  /*  for(size_t t= 0; t < 14; t++)
+  {
+    Serial.print(mMatchDataLong.TeamName1[t]);
+    TeamName1[t] = mMatchDataLong.TeamName1[t];
+
+  }
+
+    for(size_t t= 0; t < 14; t++)
+  {
+    Serial.print(mMatchDataLong.TeamName2[t]);
+    TeamName2[t] = mMatchDataLong.TeamName2[t];
+    
+  }*/
+  _radio.send(0, &mMatchDataLong, sizeof(mMatchDataLong), NRFLite::NO_ACK);
 }

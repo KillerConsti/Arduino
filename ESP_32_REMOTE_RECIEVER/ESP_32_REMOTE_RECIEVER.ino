@@ -91,7 +91,7 @@ Commandpackage _radioCmdData;
 /*
 The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
 */
-void SetCurrentMatchField1(int mMatchNum)
+void SetCurrentMatchField1(int mMatchNum,bool sendtoScoreboard = true)
 {
   //Serial.println(mMatchNum);
   if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField1 /2))
@@ -128,6 +128,19 @@ void SetCurrentMatchField1(int mMatchNum)
     Serial.println("...fail");
   }
   Serial.println("send stuff");
+    Serial.println("try to send match data long to scoreboard");
+    if(sendtoScoreboard)
+    {
+   if(_radio.send(1, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
+  Serial.println("send stuff");
+    }
 }
 
 void SetNextMatchField1(int mMatchNumCurrentMatch)
@@ -162,10 +175,9 @@ void SetNextMatchField1(int mMatchNumCurrentMatch)
   {
     Serial.println("...fail");
   }
-  Serial.println("send stuff");
 }
 
-void SetCurrentMatchField2(int mMatchNum)
+void SetCurrentMatchField2(int mMatchNum,bool sendtoScoreboard = true)
 {
   //Serial.println(mMatchNum);
   if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField2 /2))
@@ -198,7 +210,19 @@ void SetCurrentMatchField2(int mMatchNum)
   {
     Serial.println("...fail");
   }
+  Serial.println("send current match to Scoreboar 2");
+  if(sendtoScoreboard)
+  {
+     if(_radio.send(2, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  {
+    Serial.println("...success");
+  }
+  else
+  {
+    Serial.println("...fail");
+  }
   Serial.println("send stuff");
+  }
 }
 
 void SetNextMatchField2(int mMatchNumCurrentMatch)
@@ -453,7 +477,35 @@ void loop() {
         NeedToNotifyLEDShort2 = true;
         NeedToNotifyBLE_BothMatches = true;
       }
-  } else if (packetSize == sizeof(RadioHistoryPacket)) {
+  } 
+  else if (packetSize == sizeof(MatchDataLong))
+  {
+    _radio.readData(&mMatchDataLong);
+    //we just want to know what the new teamnames are (due to "swap event")
+    uint8_t type = mMatchDataLong.type; //1 is radio 1.... and 3 is radio 3
+    if(type == 1)
+    {
+            //currentMatch_Field2 =
+        for(size_t t=0; t <TeamnameLength; t++)
+        {
+          MatchNameData_Field1[t][currentMatch_Field1*2] = mMatchDataLong.TeamName1[t];
+          MatchNameData_Field1[t][currentMatch_Field1*2+1] =  mMatchDataLong.TeamName2[t];
+        }
+        SetCurrentMatchField1(currentMatch_Field1,false);
+    }
+    else if(type == 2)
+    {
+      //currentMatch_Field2 =
+        for(size_t t=0; t <TeamnameLength; t++)
+        {
+          MatchNameData_Field2[t][currentMatch_Field2*2] = mMatchDataLong.TeamName1[t];
+          MatchNameData_Field2[t][currentMatch_Field2*2+1] =  mMatchDataLong.TeamName2[t];
+        }
+        SetCurrentMatchField2(currentMatch_Field2,false);
+    }
+
+  }
+  else if (packetSize == sizeof(RadioHistoryPacket)) {
 
     uint8_t t1_won = 0;
     uint8_t t2_won = 0;

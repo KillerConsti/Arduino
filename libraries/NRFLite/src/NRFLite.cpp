@@ -13,7 +13,7 @@
     const static uint8_t USI_SCK = 2; // PB2
 #else
 	#ifdef ESP32
-		//#define HSPI_ESP
+		#define HSPI_ESP
 		#endif
 	#ifdef CORE_TEENSY
 			#define RADIO_SPI_MODE1

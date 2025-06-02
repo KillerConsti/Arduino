@@ -15,13 +15,13 @@ RoundDisplay();
 void InitDisplay();
 void DrawFox();
 void DrawVolleyball();
-void DrawOnDisplay(VolleyBallHistory History[10],int leftset,int rightset,int leftscore,int rightscore,bool NeedToUpdateSet,bool &DoNotUpdateHistoryOnDisplay);
+void DrawOnDisplay(VolleyBallHistory History[10],int leftset,int rightset,int leftscore,int rightscore,bool NeedToUpdateSet,bool &DoNotUpdateHistoryOnDisplay,char* t1,char* t2);
 void UpdateSetCounter(int leftnum,int rightnum);
-bool UpdateHistory(VolleyBallHistory History[10]); //todo upgrade clear progress to be done not too often
+bool UpdateHistory(VolleyBallHistory History[10], char* t1,char* t2); //todo upgrade clear progress to be done not too often
 void UpdateScore(int left,int right);
-bool ClearAndUpdateHistory();
+bool ClearAndUpdateHistory(char* t1,char* t2);
 void DrawFarbe(bool rechts);
-void DrawBeachfreunde(bool draw);
+void DrawBeachfreunde(bool draw,char* t1,char* t2);
 void DrawBrightness();
 void DrawSets();
 

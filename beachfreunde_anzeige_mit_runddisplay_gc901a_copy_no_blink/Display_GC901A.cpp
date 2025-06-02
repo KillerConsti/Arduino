@@ -1,12 +1,11 @@
 #include "Display_GC901A.h"
 
-
 RoundDisplay::RoundDisplay()
 {
   canvas = new GFXcanvas1(56, 42);
   canvas_single = new GFXcanvas1(32, 36);
   canvas_history = new GFXcanvas1(105, 20);
-  canvas_beachfreunde = new GFXcanvas1(165, 20);
+  canvas_beachfreunde = new GFXcanvas1(195, 30);
   tft = new Adafruit_GC9A01A(TFT_CS, TFT_DC, TFT_RS);
 
     mBrightness = 100;
@@ -75,13 +74,15 @@ void RoundDisplay::InitDisplay() {
   DrawFox();
   VolleyBallHistory lol[10]; 
   bool lol2 = false;
-  DrawOnDisplay(lol,0,0,0,0,true,lol2);
+  char t1[14];
+  t1[0] = 0;
+  DrawOnDisplay(lol,0,0,0,0,true,lol2,t1,t1);
 
   UpdateSetCounter(0,0);
   Serial.println("Init Display Finished");
 }
 
-void RoundDisplay::DrawOnDisplay(VolleyBallHistory MyVolleyHistory[10],int setleft,int setright,int leftscore,int rightscore,bool NeedToUpdateSet,bool &DoNotUpdateHistoryOnDisplay)
+void RoundDisplay::DrawOnDisplay(VolleyBallHistory MyVolleyHistory[10],int setleft,int setright,int leftscore,int rightscore,bool NeedToUpdateSet,bool &DoNotUpdateHistoryOnDisplay,char* TeamName1, char* TeamName2)
 {
   Serial.println("DrawOnDisplay started");
   int counterItems = 0;
@@ -99,7 +100,7 @@ void RoundDisplay::DrawOnDisplay(VolleyBallHistory MyVolleyHistory[10],int setle
     if (!DoNotUpdateHistoryOnDisplay)
 
     {
-      HistoryUpdated = UpdateHistory(MyVolleyHistory);
+      HistoryUpdated = UpdateHistory(MyVolleyHistory,TeamName1,TeamName2);
       Serial.println("DrawOnDisplay update history");
       NeedToUpdateSet = false;
     } else {
@@ -119,7 +120,7 @@ void RoundDisplay::DrawOnDisplay(VolleyBallHistory MyVolleyHistory[10],int setle
   mOldModifyButtonState = ModifyButtonState;
   if (!HistoryUpdated) {
     Serial.println("DrawOnDisplay update history 2");
-    UpdateHistory(MyVolleyHistory);
+    UpdateHistory(MyVolleyHistory,TeamName1,TeamName2);
   }
   Serial.println("DrawOnDisplay finished 3");
 }
@@ -224,7 +225,7 @@ void RoundDisplay::UpdateScore(int left,int right) {
                  canvas->width(), canvas->height(), KC_dirty_white, KC_BackgroundColor);
 }
 
-bool RoundDisplay::ClearAndUpdateHistory()
+bool RoundDisplay::ClearAndUpdateHistory(char* teamname1,char* teamname2)
 {
     mBottomtext = BottomText::Reset;
       canvas_history->fillScreen(0);     // Clear canvas (not display)
@@ -237,7 +238,7 @@ bool RoundDisplay::ClearAndUpdateHistory()
       switch (ModifyButtonState) {
     case 0:
       {
-        DrawBeachfreunde(true);
+        DrawBeachfreunde(true,teamname1,teamname2);
         return true;
       }
     case 1:
@@ -270,7 +271,7 @@ bool RoundDisplay::ClearAndUpdateHistory()
   return true;
 }
 
-bool RoundDisplay::UpdateHistory(VolleyBallHistory History[10]) {
+bool RoundDisplay::UpdateHistory(VolleyBallHistory History[10],char* teamname1,char* teamname2) {
   Serial.println("Update History");
   int counterItems = 0;
   int currentItems = 0;
@@ -338,7 +339,7 @@ bool RoundDisplay::UpdateHistory(VolleyBallHistory History[10]) {
     case 0:
       {
         if (currentItems < 4 && ModifyButtonState == 0)
-          DrawBeachfreunde(true);
+          DrawBeachfreunde(true,teamname1,teamname2);
         return true;
       }
     case 1:
@@ -372,15 +373,21 @@ bool RoundDisplay::UpdateHistory(VolleyBallHistory History[10]) {
   return true;
 }
 
-void RoundDisplay::DrawBeachfreunde(bool draw)  //if false we dont print
+void RoundDisplay::DrawBeachfreunde(bool draw,char* teamname1,char* teamname2)  //if false we dont print
 {
       if(mBottomtext == BottomText::Beachfreunde)
       {
-        Serial.println("Cannot draw beachfreunde");
-        return;
+        if(teamname1[0] == 0) //todo check if name changed?
+        {
+          Serial.println("Cannot draw beachfreunde");
+          return;
+        }
       }
       else
       Serial.println("draw beachfreunde");
+      if(teamname1[0] == 0)
+      {
+          Serial.println("No teamnames set");
   canvas_beachfreunde->setFont(&FreeSansBold12pt7b);
   canvas_beachfreunde->setTextSize(1);
   canvas_beachfreunde->fillScreen(0);     // Clear canvas (not display)
@@ -400,6 +407,35 @@ void RoundDisplay::DrawBeachfreunde(bool draw)  //if false we dont print
   canvas_beachfreunde->drawPixel(19, 2, 0xFFFF);
   canvas_beachfreunde->drawPixel(19, 3, 0xFFFF);
   tft->drawBitmap(95, 210, canvas_beachfreunde->getBuffer(), canvas_beachfreunde->width(), canvas_beachfreunde->height(), KC_dark_blue, KC_dirty_white);
+      }
+      else
+      {
+        Serial.println("Teamnames");
+          canvas_beachfreunde->setFont(&FreeSansBold12pt7b);
+  canvas_beachfreunde->setTextSize(1);
+  canvas_beachfreunde->fillScreen(0);     // Clear canvas (not display)
+  canvas_beachfreunde->setCursor(0, 19);  // Pos. is BASE LINE when using fonts!
+  for(size_t t=0;t<12; t++)
+  {
+    canvas_beachfreunde->print(teamname1[t]);
+  }
+  canvas_beachfreunde->print(" vs");
+  //old 37, 185
+  tft->drawBitmap(20, 170, canvas_beachfreunde->getBuffer(), canvas_beachfreunde->width(), canvas_beachfreunde->height(), KC_dark_blue, KC_dirty_white);
+
+  canvas_beachfreunde->fillScreen(0);     // Clear canvas (not display)
+  canvas_beachfreunde->setCursor(0, 19);  // Pos. is BASE LINE when using fonts!
+  canvas_beachfreunde->print("  ");
+  for(size_t t=0;t<12; t++)
+  {
+    canvas_beachfreunde->print(teamname2[t]);
+  }
+  //old 95, 210
+  tft->drawBitmap(20, 190, canvas_beachfreunde->getBuffer(), canvas_beachfreunde->width(), canvas_beachfreunde->height(), KC_dark_blue, KC_dirty_white);
+  canvas_beachfreunde->fillScreen(0);     // Clear canvas (not display)
+  tft->drawBitmap(20, 210, canvas_beachfreunde->getBuffer(), canvas_beachfreunde->width(), canvas_beachfreunde->height(), KC_dark_blue, KC_dirty_white);
+
+      }
   mBottomtext = BottomText::Beachfreunde; 
 }
 void RoundDisplay::DrawFarbe(bool rechts)  //if false we dont print
