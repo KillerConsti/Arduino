@@ -434,7 +434,7 @@ class BLEInterface
 void BleInterface();
 void initDevice();
 void SendScroreToWebBLE(String Input);
-void SendSwapTeamsToWebBle();
+void SendSwapTeamsToWebBle(char MatchId,char* NewT1,char* NewT2);
 void StartAdvertising();
 };
 
@@ -522,8 +522,24 @@ TeamNameCharacteristic_Field2->addDescriptor(new BLE2902());
   BLEDevice::startAdvertising();
 }
 
-void SendSwapTeamsToWebBle()
+void BLEInterface::SendSwapTeamsToWebBle(char MatchId,char* NewT1,char* NewT2)
 {
+  String Input;
+  if(MatchId == '1')
+
+  Input = "1,";
+  else
+  Input = "2,";
+  Input =Input+NewT1;
+  Input =Input+",";
+  Input =Input+NewT2;
+  Serial.println("String is");
+  Serial.println(Input);
+   Serial.println(MatchId);
+    Serial.println(NewT1);
+     Serial.println(NewT2);
+  	      pSensorCharacteristic->setValue(Input.c_str());
+      pSensorCharacteristic->notify();
   //copy from sendScore to webble but send a 1 instead of a 0 as first digit
 }
 

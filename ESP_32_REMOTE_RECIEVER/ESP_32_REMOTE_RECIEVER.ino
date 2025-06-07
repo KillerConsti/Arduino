@@ -481,27 +481,39 @@ void loop() {
   else if (packetSize == sizeof(MatchDataLong))
   {
     _radio.readData(&mMatchDataLong);
+    Serial.println("recieved match data long (teamnames)");
     //we just want to know what the new teamnames are (due to "swap event")
     uint8_t type = mMatchDataLong.type; //1 is radio 1.... and 3 is radio 3
     if(type == 1)
     {
             //currentMatch_Field2 =
+            char T1[14];
+            char T2[14];
         for(size_t t=0; t <TeamnameLength; t++)
         {
           MatchNameData_Field1[t][currentMatch_Field1*2] = mMatchDataLong.TeamName1[t];
           MatchNameData_Field1[t][currentMatch_Field1*2+1] =  mMatchDataLong.TeamName2[t];
+          T1[t]= mMatchDataLong.TeamName1[t];
+          T2[t]= mMatchDataLong.TeamName2[t];
         }
         SetCurrentMatchField1(currentMatch_Field1,false);
+        
+        mBLEInterface.SendSwapTeamsToWebBle('1',T1,T2);
     }
     else if(type == 2)
     {
+                  char T1[14];
+            char T2[14];
       //currentMatch_Field2 =
         for(size_t t=0; t <TeamnameLength; t++)
         {
           MatchNameData_Field2[t][currentMatch_Field2*2] = mMatchDataLong.TeamName1[t];
           MatchNameData_Field2[t][currentMatch_Field2*2+1] =  mMatchDataLong.TeamName2[t];
+                    T1[t]= mMatchDataLong.TeamName1[t];
+          T2[t]= mMatchDataLong.TeamName2[t];
         }
         SetCurrentMatchField2(currentMatch_Field2,false);
+        mBLEInterface.SendSwapTeamsToWebBle('2',T1,T2);
     }
 
   }

@@ -1543,5 +1543,6 @@ void SwapTeamNames()
     TeamName2[t] = mMatchDataLong.TeamName2[t];
     
   }*/
+  Serial.println("Swap Teamnames");
   _radio.send(0, &mMatchDataLong, sizeof(mMatchDataLong), NRFLite::NO_ACK);
 }

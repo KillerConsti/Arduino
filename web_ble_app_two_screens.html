@@ -546,8 +546,19 @@ EbersbrunN:VolleybäreN
 		{
 		var i_team = words[1] + " : " + words[2];
 		value_scores_feld2.innerHTML = i_team;
-		var i_team = words[3] + " : " + words[4];
-		value_sets_feld2.innerHTML = i_team;
+		var i_team2 = words[3] + " : " + words[4];
+		value_sets_feld2.innerHTML = i_team2;
+		}
+		else if (words[0] == "1")
+		{
+		var i_team = words[1] + " : " + words[2];
+		CurrentPlayingTeams_Match1.innerHTML = i_team;
+		}
+				else if (words[0] == "2")
+		{
+		console.log("set field 2: ", newValueReceived);
+		var i_team2 = words[1] + " : " + words[2];
+		CurrentPlayingTeams_Match2.innerHTML = i_team2;
 		}
         //retrievedValue.innerHTML = newValueReceived;
         //timestampContainer.innerHTML = getDateTime();
@@ -628,6 +639,18 @@ EbersbrunN:VolleybäreN
 		value_scores_feld2.innerHTML = i_team;
 		var i_team = words[7] + " : " + words[8];
 		value_sets_feld2.innerHTML = i_team;
+		}
+		
+				else if (words[0] == "1")
+		{
+		var i_team = words[1] + " : " + words[2];
+		CurrentPlayingTeams_Match1.innerHTML = i_team;
+		}
+				else if (words[0] == "2")
+		{
+		console.log("set field 2: ", newValueReceived);
+		var i_team2 = words[1] + " : " + words[2];
+		CurrentPlayingTeams_Match2.innerHTML = i_team2;
 		}
         //retrievedValue.innerHTML = newValueReceived;
         //timestampContainer.innerHTML = getDateTime();
