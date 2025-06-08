@@ -56,11 +56,13 @@ enum ShowMode
 {
   BeachfreundeScreen,
   CurrentStats,
-  NextStats
+  NextStats,
+  None
 };
 ShowMode mShowMode;
-#define ScreenTimeCurrent 10000
-#define ScreenTimeNext 10000
+ShowMode mNewMode;
+#define ScreenTimeCurrent 60000
+#define ScreenTimeNext 20000
 uint32_t mScreenTime = 0;
 
 struct RadioChangeEvent
@@ -600,6 +602,7 @@ void DrawNextGameScreen()
 }
 
 void setup() {
+  mNewMode = ShowMode::None;
   Serial.begin(115200);
   Serial.print(static_cast<uint8_t>('ä'));
   delay(500);
@@ -716,15 +719,12 @@ bool NewRadioEvent()
   uint8_t packetSize = _radio.hasDataISR();
   if(packetSize == 0)
   return false;
-   Serial.println(packetSize);
   if (packetSize == sizeof(MatchDataLong))
   {
-    Serial.println("Radio Msg Long recieved");
      return RecievedMatchDataLong();
   }
   else if (packetSize == sizeof(MatchDataShort))
   {
-    Serial.println("Radio Msg short recieved");
      return RecievedMatchDataShort();
   }
   else if (packetSize == sizeof(_radioCmdData))
@@ -740,33 +740,57 @@ bool HandleCMDData()
       _radio.readData(&_radioCmdData);
     uint8_t id = _radioCmdData.CommandId;
     uint8_t arg = _radioCmdData.CommandArg1;
+    mNewMode = arg;
+    return true;
     if(id != 0)
     return false;
     switch (arg)
     {
       case 0: //Beachfreunde Scrren
       {
-        Serial.print("Show Beachfreunde screen");
             ClearScreen();
   ShowBeachfreundeScreen();
         return true;
       }
       case 1:
       {
-        Serial.print("Show Scores");
         ClearScreen();
          ShowCurrentMatchScreen();
         return true;
       }
       default:
       {
-        Serial.print("Toggle between screens");
         return true; 
       }
     }
 
 }
 
+bool HandleCMDDataInLoop()
+{
+  if(mNewMode == ShowMode::None)
+  return;
+    switch (mNewMode)
+    {
+      case 0: //Beachfreunde Scrren
+      {
+            ClearScreen();
+  ShowBeachfreundeScreen();
+        return true;
+      }
+      case 1:
+      {
+        ClearScreen();
+         ShowCurrentMatchScreen();
+        return true;
+      }
+      default:
+      {
+        return true; 
+      }
+    }
+
+}
 
 
 bool RecievedMatchDataShort()
@@ -796,6 +820,10 @@ bool RecievedMatchDataShort()
     return true;
 }
 void loop() {
+  if(HandleCMDDataInLoop())
+  {
+    mNewMode = ShowMode::None;
+  }
   /*if(NewRadioEvent())
   {
     delay(500);
