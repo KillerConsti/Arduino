@@ -40,7 +40,7 @@ SMLayerScrolling<RGB, optionFlags>::SMLayerScrolling(uint16_t width, uint16_t he
 #ifdef ESP32
     assert(scrollingBitmap != NULL);
 #else
-    this->assert(scrollingBitmap != NULL);
+    //this->assert(scrollingBitmap != NULL);
 #endif
     memset(scrollingBitmap, 0x00, width * (height / 8));
     this->matrixWidth = width;
@@ -226,10 +226,14 @@ void SMLayerScrolling<RGB, optionFlags>::setMinMax(void) {
 
 template <typename RGB, unsigned int optionFlags>
 void SMLayerScrolling<RGB, optionFlags>::start(const char inputtext[], int numScrolls) {
-    int length = strlen((const char *)inputtext);
-    if (length > textLayerMaxStringLength)
-        length = textLayerMaxStringLength;
+    // int length = strlen((const char *)inputtext);
+    // if (length > textLayerMaxStringLength)
+    //     length = textLayerMaxStringLength;
+    int length = textLayerMaxStringLength;
+    if ((int)strlen((const char *)inputtext) < length)
+        length = strlen((const char *)inputtext);
     strncpy(text, (const char *)inputtext, length);
+    text[textLayerMaxStringLength-1] = '\0'; // add null-termination to fix compiler warning
     textlen = length;
     scrollcounter = numScrolls;
 
@@ -242,10 +246,14 @@ void SMLayerScrolling<RGB, optionFlags>::start(const char inputtext[], int numSc
 //Useful for a clock display where the time changes.
 template <typename RGB, unsigned int optionFlags>
 void SMLayerScrolling<RGB, optionFlags>::update(const char inputtext[]){
-    int length = strlen((const char *)inputtext);
-    if (length > textLayerMaxStringLength)
-        length = textLayerMaxStringLength;
+    // int length = strlen((const char *)inputtext);
+    // if (length > textLayerMaxStringLength)
+    //     length = textLayerMaxStringLength;
+    int length = textLayerMaxStringLength;
+    if ((int)strlen((const char *)inputtext) < length)
+        length = strlen((const char *)inputtext);
     strncpy(text, (const char *)inputtext, length);
+    text[textLayerMaxStringLength-1] = '\0'; // add null-termination to fix compiler warning
     textlen = length;
     textWidth = (textlen * scrollFont->Width) - 1;
 

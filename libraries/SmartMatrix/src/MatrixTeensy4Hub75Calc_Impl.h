@@ -381,8 +381,8 @@ FASTRUN INLINE void SmartMatrixHub75Calc<refreshDepth, matrixWidth, matrixHeight
     // go through this process for each physical row that is contained in the refresh row
     do {
         // clear buffer to prevent garbage data showing
-        memset(tempRow0, 0, sizeof(tempRow0));
-        memset(tempRow1, 0, sizeof(tempRow1));
+        memset((void *)tempRow0, 0, sizeof(tempRow0));
+        memset((void *)tempRow1, 0, sizeof(tempRow1));
 
         // Get pixel data from layers and store in tempRow0 and tempRow1
         // Scan through the entire chain of panels and extract rows from each one
@@ -503,13 +503,16 @@ FASTRUN INLINE void SmartMatrixHub75Calc<refreshDepth, matrixWidth, matrixHeight
                 g1 = tempRow1[ind].green;
                 b1 = tempRow1[ind].blue;
 
+                if(optionFlags & SMARTMATRIX_OPTIONS_HUB12_MODE) {
+                    r0 = ~r0;
+                }
+
                 // loop through each bitplane in the current pixel's RGB values and format the bits to match the FlexIO pin configuration
                 uint32_t rgbdata;
                 uint8_t shift = (16 - COLOR_DEPTH_BITS);
                 uint16_t mask = 1 << shift;
 
                 for (int bitindex = 0; bitindex < COLOR_DEPTH_BITS; bitindex++) {
-
                     rgbdata  = (r0 & mask) << (SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::getFlexPinConfig().r0);
                     rgbdata |= (g0 & mask) << (SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::getFlexPinConfig().g0);
                     rgbdata |= (b0 & mask) << (SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::getFlexPinConfig().b0);
@@ -530,8 +533,17 @@ FASTRUN INLINE void SmartMatrixHub75Calc<refreshDepth, matrixWidth, matrixHeight
                 advanceMultiRowRefreshMapToNextPixelGroup();
             }
         }
+
+        unsigned int addressbits;
+
+        if(PANEL_USES_ALT_ADDRESSING_MODE(panelType))
+            addressbits = ~(0x01 << currentRow);
+        else
+            addressbits = currentRow;
+
         // record the address in the first rowAddress field in the rowBitStruct (other rowAddress fields are unused)
-        currentRowDataPtr->rowbits[0].rowAddress = currentRow;
+        currentRowDataPtr->rowbits[0].rowAddress = addressbits;
+
         if(MULTI_ROW_REFRESH_REQUIRED) { 
             c += numPixelsPerTempRow; // keep track of cumulative number of pixels filled in refresh buffer before this temp buffer
 

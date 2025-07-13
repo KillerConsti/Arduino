@@ -593,6 +593,13 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
     submodule = latchPin.module & 0x03;
     uint16_t bitmask = 1 << submodule;
 
+    // if HUB12 panel is connected, use this flag to invert the OE output
+    bool invertOE = false;
+
+    if(optionFlags & SMARTMATRIX_OPTIONS_HUB12_MODE) {
+        invertOE = true;
+    }
+
     // stop timer until after setup is complete
     flexpwm->MCTRL &= ~FLEXPWM_MCTRL_RUN(bitmask);
 
@@ -602,14 +609,17 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
 
     // check if OE and Latch pins are switched in hardware
     volatile uint16_t * timerRegisterPeriod, * timerRegisterLatch, * timerRegisterOE;
+    uint16_t polarityBitOE;
     if ((OEPin.channel == 1) & (latchPin.channel == 2)) {
         timerRegisterPeriod = & (flexpwm->SM[submodule].VAL1);
         timerRegisterOE = & (flexpwm->SM[submodule].VAL3);
         timerRegisterLatch = & (flexpwm->SM[submodule].VAL5);
+        polarityBitOE = invertOE ? FLEXPWM_SMOCTRL_POLA : 0;
     } else {
         timerRegisterPeriod = & (flexpwm->SM[submodule].VAL1);
         timerRegisterOE = & (flexpwm->SM[submodule].VAL5);
         timerRegisterLatch = & (flexpwm->SM[submodule].VAL3);
+        polarityBitOE = invertOE ? FLEXPWM_SMOCTRL_POLB : 0;
     }
 
     // Starting PWM period and duty cycle
@@ -623,6 +633,7 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
     *timerRegisterPeriod = period;
     *timerRegisterOE = dutyCycleOE;
     *timerRegisterLatch = dutyCycleLatch;
+    flexpwm->SM[submodule].OCTRL = polarityBitOE;
     flexpwm->OUTEN |= FLEXPWM_OUTEN_PWMA_EN(bitmask);
     flexpwm->OUTEN |= FLEXPWM_OUTEN_PWMB_EN(bitmask);
     flexpwm->MCTRL |= FLEXPWM_MCTRL_LDOK(bitmask);
@@ -645,7 +656,7 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
 
     unsigned int minorLoopBytes, minorLoopIterations, majorLoopBytes, majorLoopIterations;
     int destinationAddressOffset, destinationAddressLastOffset, sourceAddressOffset, sourceAddressLastOffset, minorLoopOffset;
-    volatile uint32_t *destinationAddress1, *destinationAddress2, *sourceAddress;
+    volatile void *destinationAddress1, *destinationAddress2, *sourceAddress;
 
     rowBitStructBytesToShift = sizeof(SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::matrixUpdateRows[0].rowbits[0].data);
 
@@ -666,11 +677,11 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
     // The destination address is set to write to the OE duty cycle register, then the period register, then reset.
     minorLoopBytes = TIMER_REGISTERS_TO_UPDATE * sizeof(uint16_t);
     majorLoopIterations = 1;
-    sourceAddress = (volatile uint32_t*) & (matrixUpdateRows[0].rowbits[0].timerValues.timer_oe);
+    sourceAddress = & (matrixUpdateRows[0].rowbits[0].timerValues.timer_oe);
     sourceAddressOffset = sizeof(uint16_t); // address offset from timer_oe to timer_period
     sourceAddressLastOffset = -TIMER_REGISTERS_TO_UPDATE * sourceAddressOffset + sizeof(matrixUpdateRows[0].rowbits[0]);
-    destinationAddress1 = (volatile uint32_t*) timerRegisterOE;
-    destinationAddress2 = (volatile uint32_t*) timerRegisterPeriod;
+    destinationAddress1 = timerRegisterOE;
+    destinationAddress2 = timerRegisterPeriod;
     destinationAddressOffset = (int)destinationAddress2 - (int)destinationAddress1;
     destinationAddressLastOffset = -TIMER_REGISTERS_TO_UPDATE * destinationAddressOffset;
     dmaUpdateTimer.TCD->SADDR = sourceAddress;
@@ -706,7 +717,7 @@ FLASHMEM void SmartMatrixRefreshT4<refreshDepth, matrixWidth, matrixHeight, pane
     minorLoopBytes = minorLoopIterations * sizeof(uint32_t);
     majorLoopBytes = rowBitStructBytesToShift;
     majorLoopIterations = majorLoopBytes / minorLoopBytes;
-    sourceAddress = (uint32_t*) & (matrixUpdateRows[0].rowbits[0].data[0]);
+    sourceAddress = & (matrixUpdateRows[0].rowbits[0].data[0]);
     sourceAddressOffset = sizeof(uint32_t);
     sourceAddressLastOffset = sizeof(matrixUpdateRows[0].rowbits[0]) - majorLoopBytes; // at completion, move on to next bitplane
     destinationAddress1 = &(flexIO->SHIFTBUF[0]);

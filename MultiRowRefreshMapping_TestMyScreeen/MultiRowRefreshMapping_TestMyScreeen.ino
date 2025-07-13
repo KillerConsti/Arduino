@@ -81,42 +81,23 @@
 
 // uncomment one line to select your MatrixHardware configuration - configuration header needs to be included before <SmartMatrix.h>
 //#include <MatrixHardware_Teensy3_ShieldV4.h>        // SmartLED Shield for Teensy 3 (V4)
-//#include <MatrixHardware_Teensy4_ShieldV5.h>        // SmartLED Shield for Teensy 4 (V5)
+#include <MatrixHardware_Teensy4_ShieldV5.h>        // SmartLED Shield for Teensy 4 (V5)
 //#include <MatrixHardware_Teensy3_ShieldV1toV3.h>    // SmartMatrix Shield for Teensy 3 V1-V3
 //#include <MatrixHardware_Teensy4_ShieldV4Adapter.h> // Teensy 4 Adapter attached to SmartLED Shield for Teensy 3 (V4)
 //#include <MatrixHardware_ESP32_V0.h>                // This file contains multiple ESP32 hardware configurations, edit the file to define GPIOPINOUT (or add #define GPIOPINOUT with a hardcoded number before this #include)
 //#include "MatrixHardware_Custom.h"                  // Copy an existing MatrixHardware file to your Sketch directory, rename, customize, and you can include it like this
 #include <SmartMatrix.h>
 
-#define MODE_MAP_REVERSE_ENGINEERING  0
-#define MODE_MAP_TESTING              1
-
-#define SKETCH_MODE   MODE_MAP_REVERSE_ENGINEERING
-//#define SKETCH_MODE   MODE_MAP_TESTING
 
 #define COLOR_DEPTH 24                  // leave this as 24 for this sketch
 
-#if (SKETCH_MODE == MODE_MAP_REVERSE_ENGINEERING)
 const uint16_t kMatrixWidth = 128;        // must be multiple of 8
-const uint16_t kMatrixHeight = 4;
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_4ROW_MOD2SCAN;          // Use this to reverse engineer mapping for a MOD2 panel
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_8ROW_MOD4SCAN;          // Use this to reverse engineer mapping for a MOD4 panel
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_16ROW_MOD8SCAN;         // Use this to reverse engineer mapping for a MOD8 panel
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_32ROW_MOD16SCAN;        // Use this to reverse engineer mapping for a MOD16 panel
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_64ROW_MOD32SCAN;        // Use this to reverse engineer mapping for a MOD32 panel
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_4ROW_MOD2SCAN_ALT_ADDX; // Use this to reverse engineer mapping for a MOD2 panel that uses alt addressing
-//const uint8_t kPanelType = SM_PANELTYPE_HUB75_8ROW_MOD4SCAN_ALT_ADDX; // Use this to reverse engineer mapping for a MOD4 panel that uses alt addressing
-#endif
-
-#if (SKETCH_MODE == MODE_MAP_TESTING)
-const uint16_t kMatrixWidth = 32;        // must be multiple of 8
-const uint16_t kMatrixHeight = 16;
-const uint8_t kPanelType = SM_PANELTYPE_HUB75_16ROW_32COL_MOD2SCAN;   // use SM_PANELTYPE_HUB75_16ROW_MOD8SCAN for common 16x32 panels
-#endif
+const uint16_t kMatrixHeight = 64;
+const uint8_t kPanelType = 10;   // use SM_PANELTYPE_HUB75_16ROW_MOD8SCAN for common 16x32 panels
 
 const uint8_t kRefreshDepth = 36;       // leave as 36 for this sketch
 const uint8_t kDmaBufferRows = 4;       // known working: 2-4, use 2 to save memory, more to keep from dropping frames and automatically lowering refresh rate
-const uint32_t kMatrixOptions = (SM_HUB75_OPTIONS_NONE);      // see http://docs.pixelmatix.com/SmartMatrix for options
+const uint32_t kMatrixOptions = (SM_HUB75_OPTIONS_MATRIXCALC_LOWPRIORITY);      // see c for options
 const uint8_t kBackgroundLayerOptions = (SM_BACKGROUND_OPTIONS_NONE);
 
 SMARTMATRIX_ALLOCATE_BUFFERS(matrix, kMatrixWidth, kMatrixHeight, kRefreshDepth, kDmaBufferRows, kPanelType, kMatrixOptions);
@@ -126,8 +107,9 @@ void setup() {
   matrix.addLayer(&backgroundLayer); 
   matrix.begin();
 
-  matrix.setBrightness(128);
-
+  matrix.setBrightness(255);
+  Serial.begin(9600);
+  Serial.print("yo there is sth");
   // do a (normally unnecessary) swapBuffers call to work around ESP32 bug where first swap is ignored
   backgroundLayer.swapBuffers();   
 }
@@ -144,10 +126,9 @@ void loop() {
       
     for(int i=0; i<kMatrixWidth; i++) {
       backgroundLayer.drawPixel(i,j,colorByHeight);
-      backgroundLayer.swapBuffers();   
-      delay(250);  
-
-      backgroundLayer.fillScreen({0,0,0});
     }
+    backgroundLayer.swapBuffers();   
+    backgroundLayer.fillScreen({0,0,0});
+    delay(500);  
   }
 }

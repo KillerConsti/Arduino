@@ -23,7 +23,7 @@
 
 #include "MatrixCommonHub75.h"
 #include "MatrixPanelMaps.h"
-
+#include "Arduino.h"
 // use this for all linear panels (e.g. panels that draw a single left-to-right line for each RGB channel)
 const PanelMappingEntry defaultPanelMap[] =
 {
@@ -99,8 +99,81 @@ const PanelMappingEntry panelMap32x16Mod4V2[] =
     {0, 0, 0}   // last entry is all zeros
 };
 
+const PanelMappingEntry panelMap32x16Mod4V3[] =
+{
+    {0, 8, 8},
+    {0, 24, 8},
+    {0, 40, 8},
+    {0, 56, 8},
+    {4, 0, 8},
+    {4, 16, 8},
+    {4, 32, 8},
+    {4, 48, 8},
+    {0, 0, 0} // last entry is all zeros
+};
+
+const PanelMappingEntry panelMap64x32Mod8[] =
+{
+    {0, 64, 64},
+    {8, 0, 64},
+    {0, 0, 0}   // last entry is all zeros
+};
+
+const PanelMappingEntry panelMap64x64Mod16[] =
+{
+{0,64,64},
+{16,0,64},
+{0,0,0}
+};
+
+// Applied patch from https://community.pixelmatix.com/t/mapping-assistance-32x16-p10/889/23 not fully integrated (ESP32 only)
+const PanelMappingEntry panelMap32x16Mod4V4[] =
+{
+    {0, 7, -8},
+    {0, 23, -8},
+    {0, 39, -8},
+    {0, 55, -8},
+    {4, 8,   8},
+    {4, 24,  8},
+    {4, 40,  8},
+    {4, 56,  8}, 
+    {0, 0, 0}   // last entry is all zeros
+};
+
+const PanelMappingEntry panelMap32x16Mod2V2[] =
+{
+    {0, 31, -8},
+    {0, 63, -8},
+    {0, 95, -8},
+    {0, 127, -8},
+    {2, 16, 8},
+    {2, 48, 8},
+    {2, 80, 8},
+    {2, 112, 8},
+    {4, 15, -8},
+    {4, 47, -8},
+    {4, 79, -8},
+    {4, 111, -8},
+    {6, 0, 8},
+    {6, 32, 8},
+    {6, 64, 8},
+    {6, 96, 8},
+    {0, 0, 0} // last entry is all zeros
+};
+
+const PanelMappingEntry panelMap64x32_MyOutdoorPanel[] =
+{
+    {0, 64, 64},
+    {8, 0, 64},
+    {0, 0, 0}   // last entry is all zeros
+};
+
 const PanelMappingEntry * getMultiRowRefreshPanelMap(unsigned char panelType) {
     switch(panelType) {
+        case SMARTMATRIX_HUB75_64ROW_64COL_MOD16SCAN:
+            return panelMap64x64Mod16;
+        case SMARTMATRIX_HUB75_32ROW_64COL_MOD8SCAN:
+            return panelMap64x32Mod8;
         case SMARTMATRIX_HUB75_16ROW_32COL_MOD2SCAN:
             return panelMap32x16Mod2;
         case SMARTMATRIX_HUB12_16ROW_32COL_MOD4SCAN:
@@ -109,6 +182,22 @@ const PanelMappingEntry * getMultiRowRefreshPanelMap(unsigned char panelType) {
             return panelMap32x16Mod4;
         case SMARTMATRIX_HUB75_16ROW_32COL_MOD4SCAN_V2:
             return panelMap32x16Mod4V2;
+        case SMARTMATRIX_HUB75_16ROW_32COL_MOD4SCAN_V3:
+            return panelMap32x16Mod4V3;
+        case SMARTMATRIX_HUB75_16ROW_32COL_MOD4SCAN_V4:
+            return panelMap32x16Mod4V4;
+        case SMARTMATRIX_HUB75_16ROW_32COL_MOD2SCAN_V2:
+            return panelMap32x16Mod2V2;
+		case SM_PANELTYPE_HUB75_16ROW_MOD8SCAN_OUTDOOR_PANELS:
+		{
+			Serial.print("use my outdoor panel");
+			return panelMap32x16Mod4V4;
+		}
+				case SM_PANELTYPE_HUB75_32ROW_MOD8SCAN_OUTDOOR_PANELS:
+		{
+			Serial.print("use my outdoor panel");
+			return panelMap64x32_MyOutdoorPanel;
+		}
         default:
             return defaultPanelMap;            
     }

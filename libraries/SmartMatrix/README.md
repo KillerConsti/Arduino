@@ -14,7 +14,7 @@ The documentation in this README contains the basic information you may need to 
 
 ## Hardware
 
-SmartMatrix Library runs best on the Teensy 4.0 and 4.1 using the SmartLED Shield for Teensy 4, available from [Crowd Supply](https://www.crowdsupply.com/pixelmatix/smartled-shield-for-teensy-4) and other distributors.  If you want to use the less powerful but more mature Teensy 3, you can use the SmartLED Shield for Teensy 3, available from [Adafruit](https://www.adafruit.com/product/1902), [SparkFun](http://sparkfun.com/products/15046), [Digi-Key](https://www.digikey.com/product-detail/en/sparkfun-electronics/DEV-15046/1568-1954-ND/9739875), and other distributors around the globe.  The shield doesn't require any soldering to get started, besides putting pins on your Teensy board.
+SmartMatrix Library runs best on the Teensy 4.0 and 4.1 using the SmartLED Shield for Teensy 4, available from [distributors in the US and China](http://docs.pixelmatix.com/SmartMatrix/shop.html).  If you want to use the less powerful but more mature Teensy 3, you can use the SmartLED Shield for Teensy 3, available from [Adafruit](https://www.adafruit.com/product/1902), [SparkFun](http://sparkfun.com/products/15046), [Digi-Key](https://www.digikey.com/product-detail/en/sparkfun-electronics/DEV-15046/1568-1954-ND/9739875), and other distributors around the globe.  The shield doesn't require any soldering to get started, besides putting pins on your Teensy board.
 
 <p align="center"><img src="https://github.com/pixelmatix/SmartMatrix/wiki/photos/slsv4.jpg" alt="" width="50%" /></p>
 
@@ -25,6 +25,8 @@ There's an [adapter PCB design](https://community.pixelmatix.com/t/teensy-4-0-re
 You can wire up a [bare Teensy 3.x to a HUB75 panel](http://docs.pixelmatix.com/SmartMatrix/shieldref.html#smartled-shield-formerly-smartmatrix-shield-overview-technical-details-manually-connecting-teensy-and-panel), but at a minimum it's recommended to use 5V level shifters to drive the panels with the voltage level they are expecting.  There's a recommended circuit with latch chip to use with the Teensy 3 that will reduce the amount of pins used.  The Teensy 4 requires an external latch.
 
 The shields are Open Source Hardware, with design files posted in the `/extras/hardware/` directories.
+
+Documentation for the SmartLED Shield Hardware is available here: [SmartMatrix Docs](http://docs.pixelmatix.com/SmartMatrix/shieldref.html)
 
 ## Teensy 4
 
@@ -108,6 +110,8 @@ You can chain several panels together to create a wider or taller display than o
   * Note `SM_HUB75_OPTIONS_C_SHAPE_STACKING` isn't compatible with panels that require the Multi Row Refresh Mapping feature (if your `kPanelType` value includes the column size, it likely requires Multi Row Refresh Mapping, e.g. `SM_PANELTYPE_HUB75_16ROW_32COL_MOD2SCAN`)
 * Panel Direction - By default the first panel is on the top row.  To stack panels the other way, use `SM_HUB75_OPTIONS_BOTTOM_TO_TOP_STACKING`.  
 * To set multiple options, use the bitwise-OR operator e.g. for C-shape Bottom-to-top stacking: `const uint8_t kMatrixOptions = (SM_HUB75_OPTIONS_C_SHAPE_STACKING | SM_HUB75_OPTIONS_BOTTOM_TO_TOP_STACKING);`
+
+Note: the stacking direction was reversed in the `teensylc` and `teensy4` branches prior to the release of SmartMatrix Library 4.0.  The stacking direction is still reversed for the ESP32 Platform as of SmartMatrix Library 4.0.3, and will be fixed at some point in the future.
 
 Click the Upload button, and the sketch should compile and upload to your Teensy, and start running right away.
 

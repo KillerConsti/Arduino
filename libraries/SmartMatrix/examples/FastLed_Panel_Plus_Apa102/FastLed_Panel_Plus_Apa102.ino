@@ -49,8 +49,8 @@ SMARTMATRIX_ALLOCATE_SCROLLING_LAYER(scrollingLayer, kMatrixWidth, kMatrixHeight
 #endif
 
 #if (ENABLE_APA102_REFRESH == 1)
-const uint8_t kApaMatrixWidth = 8;          // adjust this to your APA matrix/strip
-const uint8_t kApaMatrixHeight = 8;         // set kApaMatrixHeight to 1 for a strip
+const uint16_t kApaMatrixWidth = 8;          // adjust this to your APA matrix/strip
+const uint16_t kApaMatrixHeight = 8;         // set kApaMatrixHeight to 1 for a strip
 const uint8_t kApaRefreshDepth = 36;        // not used for APA matrices as of now
 const uint8_t kApaDmaBufferRows = 1;        // not used for APA matrices as of now
 const uint8_t kApaPanelType = 0;            // not used for APA matrices as of now
@@ -127,7 +127,6 @@ void setup() {
 #if (ENABLE_HUB75_REFRESH == 1)
   matrix.addLayer(&backgroundLayer); 
   matrix.addLayer(&scrollingLayer); 
-  //matrix.setBrightness(0);
   matrix.begin();
 
   // lower the brightness
@@ -156,8 +155,7 @@ void setup() {
   apamatrix.begin();
 
   // lower the brightness
-  //apamatrix.setBrightness(128);
-  apamatrix.setBrightness(32);
+  apamatrix.setBrightness(128);
 #endif
 
   // Initialize our coordinates to some random values
@@ -188,7 +186,6 @@ void fillnoise8() {
   z += speed;
 }
 
-#if 1
 void loop() {
   static uint8_t ihue=0;
 
@@ -245,32 +242,6 @@ void loop() {
 
   ihue+=1;
 
-  matrix.countFPS();      // print the loop() frames per second to Serial
+  // matrix.countFPS();      // print the loop() frames per second to Serial
+  // apamatrix.countFPS();      // print the loop() frames per second to Serial
 }
-#else
-void loop() {
-  EVERY_N_MILLISECONDS(1000/30) {
-
-    while(apaBackgroundLayer.isSwapPending());
-    buffer = apaBackgroundLayer.backBuffer();
-
-    dimAll(250);
-
-    static uint8_t theta = 0;
-    static uint8_t hue = 0;
-    
-    for (uint8_t x = 0; x < kApaMatrixWidth; x++) {
-      uint8_t y = quadwave8(x * 2 + theta) / scale;
-      if(y < kApaMatrixHeight) {
-        buffer[XY(x, y)] = CRGB(CHSV(x + hue, 255, 255));
-        buffer[XY(x, y)].red = 0;
-      }
-    }
-
-    theta++;
-    hue++;
-
-    apaBackgroundLayer.swapBuffers(true);
-  }
-}
-#endif

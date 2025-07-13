@@ -14,9 +14,6 @@ RoundDisplay display;
 SquareDisplay display;
 #endif
 
-#include "tm1638.h"
-
-tm1638 tm;
 
 LED_MATRIX rgb_mat;
 
@@ -43,7 +40,8 @@ const static uint8_t PIN_RADIO_INTERRUPT = 3; //Need to set this for esp32
 #else /* UNO */
 #include "SPI.h"
 #define DATA_PIN 1
-#define DATA2_PIN 0
+//Data 2 PIM <-> we left it out because we dont have a free pin
+#define DATA2_PIN 100
 //drehschalter <-> noticed that we changed DT for interrupt reason
 int CLK = 2;
 int DT = 17;
@@ -62,6 +60,10 @@ int b_links_oben = 6;
 int b_links_unten = 5;
 #endif
 
+int button_swap = 19;
+int button_reset =0;
+int button_finish_set = 18;
+
 char TeamName1[14];
 char TeamName2[14];
 //funker
@@ -78,6 +80,7 @@ int currentPalette_index_LeftNumber;
 int currentPalette_index_MiddleNumber;
 int currentPalette_index_RightNumber;
 int Helligkeit;
+int SendSwapTeamnames = 0;
 //Bedienungselements
 
 
@@ -95,10 +98,11 @@ unsigned long ButtonTimeRightDown = 0;
 unsigned long ButtonTimeReset = 0;
 
 unsigned long ButtonTimeSwap = 0;
+
+
 int ModifyButtonState = 0;
 bool ColorVal_changed = false;
 bool OldBlinkState;
-bool SubmitSetChange = false;
 bool DoNotUpdateHistoryOnDisplay = false;
 bool PartyMode = false;
 VolleyBallHistory MyVolleyHistory[10];
@@ -182,6 +186,12 @@ int b_links_oben_old_state = LOW;
 
 int b_links_unten_old_state = LOW;
 
+int button_swap_Score =LOW;
+
+int button_submit_Sets_State = LOW;
+
+int button_Reset_State = LOW;
+
 /*pinout Sendemodul NRF24L01
 //von oben links (viereckiger Pol)
 GND	GND 
@@ -228,7 +238,7 @@ struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes ca
   uint8_t T2_Score;
   uint8_t T1_Sets;
   uint8_t T2_Sets;
-  uint32_t FailedTxCount;
+  uint32_t FailedTxCount = 0;
 };
 
 struct __attribute__((packed)) MatchDataLong  // Any packet up to 32 bytes can be sent.
@@ -244,7 +254,7 @@ struct __attribute__((packed)) RadioHistoryPacket  // Any packet up to 32 bytes 
 {
   uint8_t FromRadioId = RADIO_ID;
   VolleyBallHistory myVolleyBallHistory[5];
-  uint32_t FailedTxCount;
+  uint32_t FailedTxCount = 0;
   bool WePerformedSwap = false;
 };
 struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can be sent.
@@ -256,8 +266,11 @@ struct __attribute__((packed)) Commandpackage  // Any packet up to 32 bytes can 
   uint8_t CommandArg4 = 0;
 };
 //we wont use delay
-bool mRadioNeedUpdateScore = false;
-bool mRadioRemoteNeedUpdateScore = false;
+#define RESENDTIMES 10
+#define RADIO_PAUSE_TIME 10
+#define No_Radio_Info_To_Serial
+int mRadioNeedUpdateScore = 0; //0 is false  <1-10> are tries
+int mRadioRemoteNeedUpdateScore = 0; //Same
 bool mRadioHistoryNeedUpdate = false;
 bool mNeedToSetNewNumber = false;
 bool mNeedToSetNewNumberInformRadio = false;
@@ -314,6 +327,9 @@ void setup() {
   pinMode(DT, INPUT_PULLUP);
   pinMode(SW, INPUT_PULLUP);
 
+  pinMode(button_swap, INPUT);
+  pinMode(button_reset, INPUT);
+  pinMode(button_finish_set, INPUT);
 
   //set first values for buttons:)
   b_oben_rechts_old_state = digitalRead(b_oben_rechts);
@@ -369,7 +385,7 @@ void setup() {
   //init Radio
   //pinMode(PIN_RADIO_INTERRUPT, INPUT);
 
-  if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+  if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN,NRFLite::BITRATE250KBPS)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
@@ -402,15 +418,15 @@ void SetNewNumberWasRequested()  //Set Number but only on event
 
   if (InformRadio && mNewScore.Points1 != mOldScore.Points1 || mNewScore.Set1 != mOldScore.Set1 || mNewScore.Points2 != mOldScore.Points2 || mNewScore.Set2 != mOldScore.Set2) {
     //Inform RadioSystem
-    mRadioNeedUpdateScore = true;
-    mRadioRemoteNeedUpdateScore = true;
+    mRadioNeedUpdateScore = RESENDTIMES;
+    mRadioRemoteNeedUpdateScore = RESENDTIMES;
   }
 
   
   //left side
   if (mNewScore.UpdateColorLeft || mNewScore.Points1 != mOldScore.Points1) {
-        mRadioNeedUpdateScore = true;
-    mRadioRemoteNeedUpdateScore = true;
+        mRadioNeedUpdateScore = RESENDTIMES;
+    mRadioRemoteNeedUpdateScore = RESENDTIMES;
     rgb_mat.SetNewNumberLeft(left_number_value,currentPalette_index_LeftNumber);
   }
 
@@ -427,7 +443,6 @@ void SetNewNumberWasRequested()  //Set Number but only on event
   }
   mOldScore = mNewScore;
   rgb_mat.Show();
-  tm.SetNewScore(mNewScore.Points1,mNewScore.Points2,mNewScore.Set1,mNewScore.Set2);
 
 }
 
@@ -502,31 +517,11 @@ void ModifyColor(bool GoUP) {
 
 bool CheckInputState()  //return Anything changed?
 {
-  uint16_t RemoteCode = tm.EventKeyTriggered(ModifyButtonState);
-  if(RemoteCode != 0)
-  {
-    ExecuteRemoteCode(RemoteCode);
-    return true;
-  }
   bool AnythingChanged = false;
   //this is done in interrupt now (faster updates?)
   //n = digitalRead(CLK);
   Taster = !digitalRead(SW);
   /* long press Button -> submit set*/
-  if (Taster == false) {
-    //Serial.println("Button not pressed");
-
-    ButtonTimeSubmitSet = CurrentTime;
-  } else if (Letzte_Taster) {
-    if (CurrentTime - 1000 > ButtonTimeSubmitSet) {
-      //Submit Sentence
-      Serial.println("Submit a change");
-      ButtonTimeSubmitSet = CurrentTime + 10000;
-      SubmitSetChange = true;
-      HandleSetFinished();
-      return true;
-    }
-  }
   /* mod -> submit set<- end here*/
   if (Taster != Letzte_Taster) {
     Serial.print(Position);
@@ -537,11 +532,6 @@ bool CheckInputState()  //return Anything changed?
     //delay(10);
     Letzte_Taster = Taster;
     //this tells us to go in another mode
-    if (SubmitSetChange)  //do not go in next mode if we long pressed button
-    {
-      SubmitSetChange = false;
-      return false;
-    }
     if (Letzte_Taster == false) {
       AnythingChanged = true;
       if (ColorVal_changed)  //write new color to EEPROM -stays in memory even after reset
@@ -608,7 +598,105 @@ bool CheckInputState()  //return Anything changed?
   * -there is a ignore property which disable increasing that is used when doing "easy swap" by pressing both upper buttons
   * do it 4 times 4 each button
   */
+  /*
 
+  */
+  /*int button_swap = 0;
+int button_reset =18;
+int button_finish_set = 19;
+int button_change_Score =LOW;
+
+int button_submit_Sets_State = LOW;
+
+int button_Reset_State = LOW;*/
+
+  if(button_swap_Score != digitalRead(button_swap))
+  {
+    button_swap_Score = digitalRead(button_swap);
+    Serial.print("Swap|");
+    Serial.println(button_swap_Score);
+    if (ButtonTimeSwap + 200 < millis() && button_swap_Score == false) {
+        //save two values
+        int mem1 = right_nmber_value;
+        int mem2 = right_set_value;
+        //overwrite "swap" all 4 values
+        right_nmber_value = left_number_value;
+        right_set_value = left_set_value;
+        left_number_value = mem1;
+        left_set_value = mem2;
+        //this is to make it unable to increase value after releasing buttons
+        IgnoreUpdateLeftBecauseSwap = true;
+        IgnoreUpdateRightBecauseSwap = true;
+        AnythingChanged = true;
+        mOldScore.Points1 = -10;
+        mOldScore.Points2 = -10;
+        SwapVolleyballHistory();
+        WhatIsTheReason.ScoreChanged = true;
+        WhatIsTheReason.SetsChanged = true;
+        WhatIsTheReason.NeedToCareForHistoryLimit = true;
+        //force non update if not pressed buttons agains
+        ButtonTimeSwap = millis();  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
+
+        #ifdef SwapColor
+        int zwischen = currentPalette_index_LeftNumber;
+        currentPalette_index_LeftNumber = currentPalette_index_RightNumber;
+        currentPalette_index_RightNumber = zwischen;
+        #endif
+      }
+  }
+
+    if(button_Reset_State != digitalRead(button_reset))
+  {
+    button_Reset_State = digitalRead(button_reset);
+    Serial.print("Reset|");
+ Serial.println(button_Reset_State);
+    if (ButtonTimeReset + 200 < millis()  && button_Reset_State == false)  //reset after pressing all buttons 2 secs
+    {
+      if (right_nmber_value == 0 && left_number_value == 0) {
+        right_nmber_value = 0;
+        right_set_value = 0;
+        left_number_value = 0;
+        left_set_value = 0;
+        ModifyButtonState = 0;
+        AnythingChanged = true;
+        ButtonTimeReset = millis();  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
+        ClearAllVolleyBallHistory();
+        display.ClearAndUpdateHistory(TeamName1,TeamName2);
+        WhatIsTheReason.SetsChanged = true;
+        WhatIsTheReason.NeedToCareForHistoryLimit = true;
+        mOldScore.Points1 = -15;
+        mOldScore.Points2 = -15;
+        mOldScore.Set1 = -1;
+        mOldScore.Set2 = -1;
+        Serial.println("Hard Reset");
+      } else {
+        mOldScore.Points1 = -10;
+        mOldScore.Points2 = -10;
+        left_number_value = 0;
+        right_nmber_value = 0;
+        WhatIsTheReason.ScoreChanged = true;
+        AnythingChanged = true;
+        Serial.println("Point Reset");
+        ButtonTimeReset = millis();  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
+      }
+    }
+  }
+
+  //submit sets
+      if(button_submit_Sets_State != digitalRead(button_finish_set))
+  {
+    button_submit_Sets_State = digitalRead(button_finish_set);
+    Serial.print("Submit Set|");
+    Serial.println(button_submit_Sets_State);
+    if (ButtonTimeSubmitSet + 200 < millis() && button_submit_Sets_State == false)  //reset after pressing all buttons 2 secs
+    {
+      Serial.println("Submit a change");
+      ButtonTimeSubmitSet = millis();
+      HandleSetFinished();
+      AnythingChanged = true;
+    }
+  }
+  
   //upper right
   if (b_oben_rechts_old_state != digitalRead(b_oben_rechts)) {
     b_oben_rechts_old_state = digitalRead(b_oben_rechts);
@@ -617,9 +705,9 @@ bool CheckInputState()  //return Anything changed?
     if (ButtonTimeRightUP + 200 < millis() && b_oben_rechts_old_state == false) {
       AnythingChanged = true;
       ButtonTimeRightUP = millis();
-      if (IgnoreUpdateRightBecauseSwap)
-        IgnoreUpdateRightBecauseSwap = false;
-      else if (ModifyButtonState != 2) {
+      //if (IgnoreUpdateRightBecauseSwap)
+        //IgnoreUpdateRightBecauseSwap = false;
+      if (ModifyButtonState != 2) {
         right_nmber_value = constrain(right_nmber_value + 1, 0, 99);
         WhatIsTheReason.ScoreChanged = true;
       } else {
@@ -659,9 +747,9 @@ bool CheckInputState()  //return Anything changed?
     if (ButtonTimeLeftUP + 200 < millis() && b_links_oben_old_state == false) {
       AnythingChanged = true;
       ButtonTimeLeftUP = millis();
-      if (IgnoreUpdateLeftBecauseSwap)
-        IgnoreUpdateLeftBecauseSwap = false;
-      else if (ModifyButtonState != 2)
+      //if (IgnoreUpdateLeftBecauseSwap)
+        //IgnoreUpdateLeftBecauseSwap = false;
+      if (ModifyButtonState != 2)
     {
         left_number_value = constrain(left_number_value + 1, 0, 99);
         WhatIsTheReason.ScoreChanged = true;
@@ -695,197 +783,12 @@ bool CheckInputState()  //return Anything changed?
     }
   }
 
-  /*save and reset*/
-  if (!b_links_unten_old_state || !b_unten_rechts_old_state)  //safety allow it only all 10 secs
-  {
-    ButtonTimeReset = millis();  //get current time
-  }
-  if (b_links_unten_old_state && b_unten_rechts_old_state)  //reset funktion - hold both lower buttons for 3 secs
-  {
-    if (ButtonTimeReset + 1500 < millis())  //reset after pressing all buttons 2 secs
-    {
-      if (right_nmber_value == 0 && left_number_value == 0) {
-        right_nmber_value = 0;
-        right_set_value = 0;
-        left_number_value = 0;
-        left_set_value = 0;
-        ModifyButtonState = 0;
-        AnythingChanged = true;
-        ButtonTimeReset = millis() + 100000;  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
-        ClearAllVolleyBallHistory();
-        display.ClearAndUpdateHistory(TeamName1,TeamName2);
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.NeedToCareForHistoryLimit = true;
-        mOldScore.Points1 = -15;
-        mOldScore.Points2 = -15;
-        mOldScore.Set1 = -1;
-        mOldScore.Set2 = -1;
-        Serial.println("Hard Reset");
-      } else {
-        mOldScore.Points1 = -10;
-        mOldScore.Points2 = -10;
-        left_number_value = 0;
-        right_nmber_value = 0;
-        WhatIsTheReason.ScoreChanged = true;
-        AnythingChanged = true;
-        Serial.println("Point Reset");
-        ButtonTimeReset = millis() + 100000;  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
-      }
-    }
-  }
 
-  /*swap places fct (press both up buttons for 2 secs)
-    /must tell up-buttons to not increase so points stay the same
-    */
-  if (b_links_oben_old_state && b_oben_rechts_old_state)  //reset funktion
-  {
-    if (millis() > ButtonTimeSwap + 10000)  //safety allow it only all 10 secs
-    {
-      ButtonTimeSwap = millis();  //get current time
-    } else {
-      if (ButtonTimeSwap + 2000 < millis())  //swap after pressing all buttons 3 secs
-      {
-        //save two values
-        int mem1 = right_nmber_value;
-        int mem2 = right_set_value;
-        //overwrite "swap" all 4 values
-        right_nmber_value = left_number_value;
-        right_set_value = left_set_value;
-        left_number_value = mem1;
-        left_set_value = mem2;
-        //this is to make it unable to increase value after releasing buttons
-        IgnoreUpdateLeftBecauseSwap = true;
-        IgnoreUpdateRightBecauseSwap = true;
-        AnythingChanged = true;
-        mOldScore.Points1 = -10;
-        mOldScore.Points2 = -10;
-        SwapVolleyballHistory();
-        WhatIsTheReason.ScoreChanged = true;
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.NeedToCareForHistoryLimit = true;
-        //force non update if not pressed buttons agains
-        ButtonTimeSwap = millis() + 100000;  //set it increadible high so it wont be triggered again if buttons are not released (wait 100 secs)
 
-        #ifdef SwapColor
-        int zwischen = currentPalette_index_LeftNumber;
-        currentPalette_index_LeftNumber = currentPalette_index_RightNumber;
-        currentPalette_index_RightNumber = zwischen;
-        #endif
-      }
-    }
-  } else
-    ButtonTimeSwap = 0;
   return AnythingChanged;
 }
 
-void ExecuteRemoteCode(uint16_t RemoteCode)
-{
-  Serial.print("Remote code ");
-  Serial.println(RemoteCode);
-  //down right button
-  if(RemoteCode & 1)
-  {
-        right_nmber_value = constrain(right_nmber_value - 1, 0, 99);
-        WhatIsTheReason.ScoreChanged = true;
-  }
-    if(RemoteCode & 2)
-  {
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.UpdateHistoryOnDisplay = true;
-        right_set_value = constrain(right_set_value - 1, 0, 3);
-  }
-  //down left button
-  if(RemoteCode & 4)
-  {
-        left_number_value = constrain(left_number_value - 1, 0, 99);
-        WhatIsTheReason.ScoreChanged = true;
-  }
-  if(RemoteCode & 8)
-  {
-          left_set_value = constrain(left_set_value - 1, 0, 3);
-         WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.UpdateHistoryOnDisplay = true;
-  }
-  //oben rechts
-  if(RemoteCode & 16)
-  {
-        right_nmber_value = constrain(right_nmber_value + 1, 0, 99);
-        WhatIsTheReason.ScoreChanged = true;
-  }
-    if(RemoteCode & 32)
-  {
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.UpdateHistoryOnDisplay = true;
-        right_set_value = constrain(right_set_value + 1, 0, 3);
-  }
-  //oben links
-    if(RemoteCode & 64)
-  {
-        left_number_value = constrain(left_number_value + 1, 0, 99);
-        WhatIsTheReason.ScoreChanged = true;
-  }
-  if(RemoteCode & 128)
-  {
-          left_set_value = constrain(left_set_value + 1, 0, 3);
-         WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.UpdateHistoryOnDisplay = true;
-  }
-  //reset
-  if(RemoteCode & 256)
-  {
-     if (right_nmber_value == 0 && left_number_value == 0) {
-        right_nmber_value = 0;
-        right_set_value = 0;
-        left_number_value = 0;
-        left_set_value = 0;
-        ModifyButtonState = 0;
-        ClearAllVolleyBallHistory();
-        display.ClearAndUpdateHistory(TeamName1,TeamName2);
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.NeedToCareForHistoryLimit = true;
-        mOldScore.Points1 = -15;
-        mOldScore.Points2 = -15;
-        mOldScore.Set1 = -1;
-        mOldScore.Set2 = -1;
-        Serial.println("Hard Reset");
-      } else {
-        mOldScore.Points1 = -10;
-        mOldScore.Points2 = -10;
-        left_number_value = 0;
-        right_nmber_value = 0;
-        WhatIsTheReason.ScoreChanged = true;
-        Serial.println("Point Reset");
-      }
-  }
-    if(RemoteCode & 512)
-  {
-      //save two values
-        int mem1 = right_nmber_value;
-        int mem2 = right_set_value;
-        //overwrite "swap" all 4 values
-        right_nmber_value = left_number_value;
-        right_set_value = left_set_value;
-        left_number_value = mem1;
-        left_set_value = mem2;
-        //this is to make it unable to increase value after releasing buttons
-        IgnoreUpdateLeftBecauseSwap = true;
-        IgnoreUpdateRightBecauseSwap = true;
-        mOldScore.Points1 = -10;
-        mOldScore.Points2 = -10;
-        Serial.println("swap by remote");
-        SwapVolleyballHistory();
-        WhatIsTheReason.ScoreChanged = true;
-        WhatIsTheReason.SetsChanged = true;
-        WhatIsTheReason.NeedToCareForHistoryLimit = true;
-        //force non update if not pressed buttons agains
 
-        #ifdef SwapColor
-        int zwischen = currentPalette_index_LeftNumber;
-        currentPalette_index_LeftNumber = currentPalette_index_RightNumber;
-        currentPalette_index_RightNumber = zwischen;
-        #endif
-  }
-}
 
 void loop() {
   CurrentTime = millis() - StartTime;
@@ -906,8 +809,8 @@ void loop() {
   }*/
   if(CheckInputState())
   {
-          mRadioNeedUpdateScore = true;
-    mRadioRemoteNeedUpdateScore = true;
+          mRadioNeedUpdateScore = RESENDTIMES;
+    mRadioRemoteNeedUpdateScore = RESENDTIMES;
       Serial.println("need to update radio");
   }
   if(mNeedToSetNewNumber)
@@ -972,30 +875,49 @@ void loop() {
       SendESP_RADIOINFO();
       //try out to send radio info
       mRadioHistoryNeedUpdate = true;
+      _radioHistoryData.FailedTxCount = 0;
       return;
-    }
-    if(!WhatIsTheReason.mUpdateForcedByRadio && mRadioHistoryNeedUpdate)
-    {
-      mRadioHistoryNeedUpdate = true;
     }
     WhatIsTheReason.mUpdateForcedByRadio = false;
 
   } 
-  else if (mRadioNeedUpdateScore && mRadioTime < millis())  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
+  else if (mRadioNeedUpdateScore > 0 && mRadioTime < millis())  //Test send Radio stuff but only if we have free time /*i.e. no update is needed)
   {
-    SendRadioInfo(0);
-    mRadioNeedUpdateScore = false;
+    if(SendRadioInfo(0))
+      mRadioNeedUpdateScore = 0;
+    else //we just lower it a little as we give us 10 tries
+    {
+        mRadioNeedUpdateScore--; 
+    }
     
     return;
   } 
-  else if(mRadioRemoteNeedUpdateScore && mRadioTime < millis())
+  else if(mRadioRemoteNeedUpdateScore > 0 && mRadioTime < millis())
   {
-    SendRadioInfo(mESP_RADIO);
-    mRadioRemoteNeedUpdateScore = false;
+    if(SendRadioInfo(mESP_RADIO))
+      mRadioRemoteNeedUpdateScore = 0;
+      else 
+       //we just lower it a little as we give us 10 tries
+    {
+        mRadioRemoteNeedUpdateScore--; 
+    }
+    //Serial.print("mRadioNeedUpdateScore : ")
+    //Serial.println(mRadioRemoteNeedUpdateScore);
   }
     else if (mRadioHistoryNeedUpdate) {
-    SendRadioHistoryInfo();
-    Serial.println("we checked mRadioHistoryNeedUpdate and called SendRadioHistoryInfo");
+      SendRadioHistoryInfo();
+      Serial.println("we checked mRadioHistoryNeedUpdate and called SendRadioHistoryInfo");
+  }
+  else if (SendSwapTeamnames > 0)
+  {
+    if(SwapTeamNames())
+    {
+      SendSwapTeamnames = 0;
+    }
+    else 
+    {
+      SendSwapTeamnames--;
+    }
   }
   if (PartyMode)
     rgb_mat.DoParty();
@@ -1109,7 +1031,7 @@ void SwapVolleyballHistory() {
     WhatIsTheReason.NeedToCareForHistoryLimit = true;
     WhatIsTheReason.UpdateHistoryOnDisplay = true;
     Serial.println("SwapVolleyballHistory");
-    SwapTeamNames();
+    SendSwapTeamnames = 10;
     WhatIsTheReason.performedswap = true; 
 }
 
@@ -1141,13 +1063,15 @@ void DrehschalterDreh1() {
 bool SendRadioInfo(int TargetRadioId) {
   //if (mRadioTime < millis()) 
   {
-    mRadioTime = millis() + 50;
+    mRadioTime = millis() + RADIO_PAUSE_TIME;
     _radioScoreData.T1_Score = left_number_value;
     _radioScoreData.T2_Score = right_nmber_value;
     _radioScoreData.T1_Sets = left_set_value;
     _radioScoreData.T2_Sets = right_set_value;
     //_radioScoreData.OnTimeMillis = millis();
-    Serial.print("Radio: Sending Score to ");
+    #ifndef No_Radio_Info_To_Serial
+      Serial.print("Radio: Sending Score to ");
+    #endif
     Serial.print(TargetRadioId);
     // By default, 'send' transmits data and waits for an acknowledgement.  If no acknowledgement is received,
     // it will try again up to 16 times.  This retry logic is built into the radio hardware itself, so it is very fast.
@@ -1159,10 +1083,14 @@ bool SendRadioInfo(int TargetRadioId) {
 
     if (_radio.send(TargetRadioId, &_radioScoreData, sizeof(_radioScoreData)))  // Note how '&' must be placed in front of the variable name.
     {
+#ifndef No_Radio_Info_To_Serial
       Serial.println("...Success");
+#endif
       return true;
     } else {
+    #ifndef No_Radio_Info_To_Serial
       Serial.println("...Failed");
+      #endif
       _radioScoreData.FailedTxCount++;
       return false;
     }
@@ -1171,11 +1099,10 @@ bool SendRadioInfo(int TargetRadioId) {
 }
 
 void SendRadioHistoryInfo() {
-  Serial.print("Radio: Sending History ");
+  //Serial.print("Radio: Sending History ");
   VolleyBallHistory RadioVolleyBallHistory[5];
-  if (mRadioTime < millis()) {
-    mRadioHistoryNeedUpdate = false;
-    mRadioTime = millis() + 20;
+
+    mRadioTime = millis() + RADIO_PAUSE_TIME;
     int mCurrentCounter = 0;
     for (size_t t = 0; t < 10; t++) {
       if (MyVolleyHistory[t].Set == false)
@@ -1195,19 +1122,30 @@ void SendRadioHistoryInfo() {
       mCurrentCounter++;
     }
     //_radioScoreData.OnTimeMillis = millis();
-
+    #ifndef No_Radio_Info_To_Serial
     Serial.print("to ");
     Serial.print(DESTINATION_RADIO_ID);
-    _radioHistoryData.WePerformedSwap = WhatIsTheReason.performedswap;
-    WhatIsTheReason.performedswap = false;
+    #endif
     if (_radio.send(DESTINATION_RADIO_ID, &_radioHistoryData, sizeof(_radioHistoryData)))  // Note how '&' must be placed in front of the variable name.
     {
-      Serial.println(" ...Success");
+          mRadioHistoryNeedUpdate = false;
+          _radioHistoryData.WePerformedSwap = WhatIsTheReason.performedswap;
+          WhatIsTheReason.performedswap = false;
+              #ifndef No_Radio_Info_To_Serial
+          Serial.println(" ...Success");
+          #endif
     } else {
+          #ifndef No_Radio_Info_To_Serial
       Serial.println(" ...Failed");
+      #endif
       _radioHistoryData.FailedTxCount++;
+      if(_radioHistoryData.FailedTxCount > 10) //max try it 10 times
+      {
+          mRadioHistoryNeedUpdate = false;
+          _radioHistoryData.WePerformedSwap = WhatIsTheReason.performedswap;
+          WhatIsTheReason.performedswap = false;
+      }
     }
-  }
 }
 void ReadTeamNameData()
 {
@@ -1269,9 +1207,10 @@ void ReadCommandData()
   Serial.println(_radioCommandData.CommandId);
   if (_radioCommandData.CommandId == 0)  //we request an update on History and Score on Radio Device
   {
-    mRadioNeedUpdateScore = true;
-    mRadioRemoteNeedUpdateScore = true;
+    mRadioNeedUpdateScore = RESENDTIMES;
+    mRadioRemoteNeedUpdateScore = RESENDTIMES;
     mRadioHistoryNeedUpdate = true;
+     _radioHistoryData.FailedTxCount = 0;
     return;  //do it next tick - when we are idel
   } else if (_radioCommandData.CommandId == 1) {
     left_number_value = _radioCommandData.CommandArg1;
@@ -1462,7 +1401,7 @@ void OnRecieve_REMOTE_CONTROL_DATA()
         WhatIsTheReason.ScoreChanged = true;
         WhatIsTheReason.SetsChanged = true;
         WhatIsTheReason.NeedToCareForHistoryLimit = true;
-                  mRadioNeedUpdateScore = true;
+                  mRadioNeedUpdateScore = RESENDTIMES;
     mRadioRemoteNeedUpdateScore = true;
         //Serial.println("SwapVolleyballHistory via remote");
         SwapVolleyballHistory();
@@ -1517,7 +1456,7 @@ void SendESP_RADIOINFO()
         tries = 0;
 }
 
-void SwapTeamNames()
+bool SwapTeamNames()
 {
   char Mem[14];
   for(size_t t= 0; t < 14;t++)
@@ -1543,6 +1482,8 @@ void SwapTeamNames()
     TeamName2[t] = mMatchDataLong.TeamName2[t];
     
   }*/
+      #ifndef No_Radio_Info_To_Serial
   Serial.println("Swap Teamnames");
-  _radio.send(0, &mMatchDataLong, sizeof(mMatchDataLong), NRFLite::NO_ACK);
+  #endif
+  return(_radio.send(0, &mMatchDataLong, sizeof(mMatchDataLong)));
 }

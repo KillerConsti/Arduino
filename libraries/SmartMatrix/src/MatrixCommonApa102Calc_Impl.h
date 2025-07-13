@@ -105,7 +105,7 @@ void SmartMatrixApaCalc<refreshDepth, matrixWidth, matrixHeight, panelType, opti
 
         do {
 #ifdef DEBUG_PINS_ENABLED
-            digitalWriteFast(DEBUG_PIN_3, HIGH); // oscilloscope trigger
+//            digitalWriteFast(DEBUG_PIN_3, HIGH); // oscilloscope trigger
 #endif
             // do once-per-frame updates
             if (!currentRow) {
@@ -135,7 +135,7 @@ void SmartMatrixApaCalc<refreshDepth, matrixWidth, matrixHeight, panelType, opti
             SmartMatrixApaCalc<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::loadMatrixBuffers(currentRowDataPtr, currentRow);
 
 #ifdef DEBUG_PINS_ENABLED
-    digitalWriteFast(DEBUG_PIN_3, LOW);
+//    digitalWriteFast(DEBUG_PIN_3, LOW);
 #endif
 
             // enqueue row
@@ -247,7 +247,7 @@ INLINE void SmartMatrixApaCalc<refreshDepth, matrixWidth, matrixHeight, panelTyp
     static rgb48 tempRow0[matrixWidth];
 
     // clear buffer to prevent garbage data showing through transparent layers
-    memset(tempRow0, 0x00, sizeof(tempRow0));
+    memset((void *)tempRow0, 0x00, sizeof(tempRow0));
 
     // get pixel data from layers
     SM_Layer * templayer = SmartMatrixApaCalc<refreshDepth, matrixWidth, matrixHeight, panelType, optionFlags>::baseLayer;

@@ -57,7 +57,11 @@ CMD4 -PartyMode
 */
 
 MatchDataLong mMatchDataLong;
- MatchDataShort mMatchDataShort;
+MatchDataLong mMatchDataLong_T1_Next;
+MatchDataLong mMatchDataLong_T2_Current;
+MatchDataLong mMatchDataLong_T2_Next;
+ MatchDataShort mMatchDataShort_T1;
+MatchDataShort mMatchDataShort_T2;
 
 /* Bluetooth */
 /*
@@ -85,19 +89,29 @@ RadioScorePacket _radioData;
 RadioHistoryPacket _radioHistoryData;
 Commandpackage _radioCmdData;
 
+int NeedToSendTeamName1_ToLED = 0;
+int NeedToSendTeamName1_ToScoreboard = 0;
 
+int NeedToSendTeamName1_NextMatch_ToLED = 0;
 
+int NeedToSendTeamName2_ToLED = 0;
+int NeedToSendTeamName2_ToScoreboard = 0;
 
+int NeedToSendTeamName2_NextMatch_ToLED = 0;
+
+int NeedToUpdateLED_T1 = 0;
+int NeedToUpdateLED_T2 = 0;
+int NeedToUpdateModeLED = 0;
 /*
 The problem is Serial.print when you pass a char * argument, it expects the array to have a null byte to denote the end of the string. Even though you passed a char array, what is passed is a char pointer (i.e. the array bounds are not passed). If you bump up the size of the arrays, and add an explicit null byte, it should print fine. You can use either '\0' or just 0 to represent a null byte, i.e.:
 */
-void SetCurrentMatchField1(int mMatchNum,bool sendtoScoreboard = true)
+bool SetCurrentMatchField1(int mMatchNum,bool sendtoScoreboard = true)
 {
   //Serial.println(mMatchNum);
   if(mMatchNum < 0 || mMatchNum > (mValidTeamNamesField1 /2))
   {
     Serial.println("SetCurrentMatchField1 invalid Matchnum");
-    return;
+    return false;
   }
   //copy data
   for(size_t t=0; t <TeamnameLength; t++)
@@ -119,28 +133,36 @@ void SetCurrentMatchField1(int mMatchNum,bool sendtoScoreboard = true)
   Serial.println(mMatchDataLong.type);
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  NeedToSendTeamName1_ToLED = 5;
+  NeedToSendTeamName1_ToScoreboard = sendtoScoreboard ? 5 : 0;
+}
+
+void SendTeamNamesCurrentMatch_1_ToRadio()
+{
+  if(NeedToSendTeamName1_ToLED > 0 )
   {
-    Serial.println("...success");
+ if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong)))
+  {
+    NeedToSendTeamName1_ToLED = 0;
   }
   else
   {
-    Serial.println("...fail");
+      NeedToSendTeamName1_ToLED = NeedToSendTeamName1_ToLED-1;
   }
-  Serial.println("send stuff");
-    Serial.println("try to send match data long to scoreboard");
-    if(sendtoScoreboard)
-    {
-   if(_radio.send(1, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+}
+if(  NeedToSendTeamName1_ToScoreboard > 0)
+{
+   if(_radio.send(1, &mMatchDataLong, sizeof(mMatchDataLong)))
   {
-    Serial.println("...success");
+   NeedToSendTeamName1_ToScoreboard = 0;
   }
   else
   {
-    Serial.println("...fail");
+    NeedToSendTeamName1_ToScoreboard = NeedToSendTeamName1_ToScoreboard-1;
   }
-  Serial.println("send stuff");
-    }
+}
+  
+  
 }
 
 void SetNextMatchField1(int mMatchNumCurrentMatch)
@@ -155,25 +177,30 @@ void SetNextMatchField1(int mMatchNumCurrentMatch)
   //copy data
   for(size_t t=0; t <TeamnameLength; t++)
   {
-    mMatchDataLong.TeamName1[t] = MatchNameData_Field1[t][NextMatchNum*2];
-    mMatchDataLong.TeamName2[t] = MatchNameData_Field1[t][NextMatchNum*2+1];
+    mMatchDataLong_T1_Next.TeamName1[t] = MatchNameData_Field1[t][NextMatchNum*2];
+    mMatchDataLong_T1_Next.TeamName2[t] = MatchNameData_Field1[t][NextMatchNum*2+1];
   }
   //mMatchDataLong.TeamName1[11] = '\0';
   //mMatchDataLong.TeamName2[11] = '\0';
   currentMatch_Field1 = mMatchNumCurrentMatch;
   //send data
 
-  mMatchDataLong.MatchNum =NextMatchNum;
-  mMatchDataLong.type = 4;
-  //Serial.println(mMatchDataLong.TeamName1);
-  //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  mMatchDataLong_T1_Next.MatchNum =NextMatchNum;
+  mMatchDataLong_T1_Next.type = 4;
+  NeedToSendTeamName1_NextMatch_ToLED = 5;
+}
+
+void SendTeamNamesNextMatch_1_ToRadio()
+{
+  if(NeedToSendTeamName1_NextMatch_ToLED > 0 )
+ 
+    if(_radio.send(8, &mMatchDataLong_T1_Next, sizeof(mMatchDataLong_T1_Next)))
   {
-    Serial.println("...success");
+    NeedToSendTeamName1_NextMatch_ToLED = 0;
   }
   else
   {
-    Serial.println("...fail");
+    NeedToSendTeamName1_NextMatch_ToLED = NeedToSendTeamName1_NextMatch_ToLED -1;
   }
 }
 
@@ -188,41 +215,52 @@ void SetCurrentMatchField2(int mMatchNum,bool sendtoScoreboard = true)
   //copy data
   for(size_t t=0; t <TeamnameLength; t++)
   {
-    mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][mMatchNum*2];
-    mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][mMatchNum*2+1];
+    mMatchDataLong_T2_Current.TeamName1[t] = MatchNameData_Field2[t][mMatchNum*2];
+    mMatchDataLong_T2_Current.TeamName2[t] = MatchNameData_Field2[t][mMatchNum*2+1];
   }
   //mMatchDataLong.TeamName1[11] = '\0';
   //mMatchDataLong.TeamName2[11] = '\0';
   currentMatch_Field2 = mMatchNum;
   //send data
 
-  mMatchDataLong.MatchNum =mMatchNum;
-  mMatchDataLong.type = 2;
-  Serial.println(mMatchDataLong.MatchNum);
-  Serial.println(mMatchDataLong.type);
+  mMatchDataLong_T2_Current.MatchNum =mMatchNum;
+  mMatchDataLong_T2_Current.type = 2;
+  Serial.println(mMatchDataLong_T2_Current.MatchNum);
+  Serial.println(mMatchDataLong_T2_Current.type);
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+
+    NeedToSendTeamName2_ToLED = 5;
+  NeedToSendTeamName2_ToScoreboard = sendtoScoreboard ? 5 : 0;
+
+}
+
+void SendTeamNamesCurrentMatch_2_ToRadio()
+{
+  if(NeedToSendTeamName2_ToLED > 0 )
   {
-    Serial.println("...success");
+ if(_radio.send(8, &mMatchDataLong_T2_Current, sizeof(mMatchDataLong_T2_Current)))
+  {
+    NeedToSendTeamName2_ToLED = 0;
   }
   else
   {
-    Serial.println("...fail");
+      NeedToSendTeamName2_ToLED = NeedToSendTeamName2_ToLED-1;
   }
-  Serial.println("send current match to Scoreboar 2");
-  if(sendtoScoreboard)
+}
+if(  NeedToSendTeamName2_ToScoreboard > 0)
+{
+   if(_radio.send(2, &mMatchDataLong_T2_Current, sizeof(mMatchDataLong_T2_Current)))
   {
-     if(_radio.send(2, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
-  {
-    Serial.println("...success");
+   NeedToSendTeamName2_ToScoreboard = 0;
   }
   else
   {
-    Serial.println("...fail");
+    NeedToSendTeamName2_ToScoreboard = NeedToSendTeamName2_ToScoreboard-1;
   }
-  Serial.println("send stuff");
-  }
+}
+  
+  
 }
 
 void SetNextMatchField2(int mMatchNumCurrentMatch)
@@ -237,29 +275,34 @@ void SetNextMatchField2(int mMatchNumCurrentMatch)
   //copy data
   for(size_t t=0; t <TeamnameLength; t++)
   {
-    mMatchDataLong.TeamName1[t] = MatchNameData_Field2[t][NextMatchNum*2];
-    mMatchDataLong.TeamName2[t] = MatchNameData_Field2[t][NextMatchNum*2+1];
+    mMatchDataLong_T2_Next.TeamName1[t] = MatchNameData_Field2[t][NextMatchNum*2];
+    mMatchDataLong_T2_Next.TeamName2[t] = MatchNameData_Field2[t][NextMatchNum*2+1];
   }
   //mMatchDataLong.TeamName1[11] = '\0';
   //mMatchDataLong.TeamName2[11] = '\0';
   currentMatch_Field2 = mMatchNumCurrentMatch;
   //send data
 
-  mMatchDataLong.MatchNum =NextMatchNum;
-  mMatchDataLong.type = 5;
+  mMatchDataLong_T2_Next.MatchNum =NextMatchNum;
+  mMatchDataLong_T2_Next.type = 5;
   //Serial.println(mMatchDataLong.TeamName1);
   //Serial.println(mMatchDataLong.TeamName2);
-    if(_radio.send(8, &mMatchDataLong, sizeof(mMatchDataLong),NRFLite::NO_ACK))
+  NeedToSendTeamName2_NextMatch_ToLED= 5;
+}
+
+void SendTeamNamesNextMatch_2_ToRadio()
+{
+  if(NeedToSendTeamName2_NextMatch_ToLED > 0 )
+ 
+    if(_radio.send(8, &mMatchDataLong_T2_Next, sizeof(mMatchDataLong_T2_Next)))
   {
-    Serial.println("...success");
+    NeedToSendTeamName2_NextMatch_ToLED = 0;
   }
   else
   {
-    Serial.println("...fail");
+    NeedToSendTeamName2_NextMatch_ToLED = NeedToSendTeamName2_NextMatch_ToLED -1;
   }
-  Serial.println("send stuff");
 }
-
 
 //Need to connect matchdata with names
 
@@ -272,32 +315,56 @@ void UpdateScreenColor() {
   mDisplay->UpdateScreenColor();
 }
 
-void SendMatchDataLongToScoreBoard(int MatchNum)
-{
-
-}
 
 void SendMatchDataShortToScoreBoard(int MatchNum)
 {
-  mMatchDataShort.FromRadioId = 0;
-  mMatchDataShort.T1_Score = mRadioScores[MatchNum].mT1;
-  mMatchDataShort.T2_Score = mRadioScores[MatchNum].mT2;
-  mMatchDataShort.T1_Sets = mRadioScores[MatchNum].mS1;
-  mMatchDataShort.T2_Sets = mRadioScores[MatchNum].mS2;
-  mMatchDataShort.MatchNum =MatchNum+1;
-  Serial.print("send data short to LED board ");
+  MatchDataShort* myMatchData = &mMatchDataShort_T1;
   
-  if(_radio.send(8, &mMatchDataShort, sizeof(mMatchDataShort),NRFLite::NO_ACK))
+  if(MatchNum == 2)
   {
-    Serial.println("...success");
+    myMatchData = &mMatchDataShort_T2;
+    NeedToUpdateLED_T2 = 5;
   }
   else
   {
-    Serial.println("...fail");
+    NeedToUpdateLED_T1 = 5;
   }
+  myMatchData->FromRadioId = 0;
+  myMatchData->T1_Score = mRadioScores[MatchNum].mT1;
+  myMatchData->T2_Score = mRadioScores[MatchNum].mT2;
+  myMatchData->T1_Sets = mRadioScores[MatchNum].mS1;
+  myMatchData->T2_Sets = mRadioScores[MatchNum].mS2;
+  myMatchData->MatchNum =MatchNum+1;
+  Serial.print("send data short to LED board ");
 }
 //Communication with ScoreBoard
+void SendScoresTeam2_ToLed()
+{
+  if(NeedToUpdateLED_T2 > 0 )
+ 
+    if(_radio.send(8, &mMatchDataShort_T2, sizeof(mMatchDataShort_T2)))
+  {
+    NeedToUpdateLED_T2 = 0;
+  }
+  else
+  {
+    NeedToUpdateLED_T2 = NeedToUpdateLED_T2 -1;
+  }
+}
 
+void SendScoresTeam1_ToLed()
+{
+  if(NeedToUpdateLED_T1 > 0 )
+ 
+    if(_radio.send(8, &mMatchDataShort_T1, sizeof(mMatchDataShort_T1)))
+  {
+    NeedToUpdateLED_T1 = 0;
+  }
+  else
+  {
+    NeedToUpdateLED_T1 = NeedToUpdateLED_T1 -1;
+  }
+}
 
 void setup(void) {
   Serial.begin(9600 );
@@ -319,7 +386,7 @@ void setup(void) {
 #define HSPI_MOSI 13 
 #define HSPI_CS 15 
 */
-        if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+        if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN,NRFLite::BITRATE250KBPS)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
@@ -351,33 +418,59 @@ void loop() {
   {
       _radioCmdData.CommandId = 0;
       _radioCmdData.CommandArg1 =LEDScreenMode;
-  if(_radio.send(8, &_radioCmdData, sizeof(_radioCmdData),NRFLite::NO_ACK))
-    Serial.println("radio msg 1 was sent succesfully");
-    NeedToUpdateScreenMode = false;
-    return;
+      NeedToUpdateModeLED = 5;
+      NeedToUpdateScreenMode= false;
+  }
+  if(NeedToUpdateModeLED > 0)
+  {
+  if(_radio.send(8, &_radioCmdData, sizeof(_radioCmdData)))
+    {
+      NeedToUpdateModeLED = 0;
+    }
+    else
+    {
+      NeedToUpdateModeLED = NeedToUpdateModeLED -1;
+    }
   }
   if(NeedToSendMachData_1_CurrentMatch)
   {
     NeedToSendMachData_1_CurrentMatch = false;
     SetCurrentMatchField1(currentMatch_Field1);
-    return;
+  }
+  if(NeedToSendTeamName1_ToLED > 0 || NeedToSendTeamName1_ToScoreboard > 0)
+  {
+    SendTeamNamesCurrentMatch_1_ToRadio();
   }
   if(NeedToSendMachData_1_NextMatch)
   {
     NeedToSendMachData_1_NextMatch = false;
     SetNextMatchField1(currentMatch_Field1);
+    
+  }
+  if(NeedToSendTeamName1_NextMatch_ToLED)
+  {
+    SendTeamNamesNextMatch_1_ToRadio();
     return;
   }
-    if(NeedToSendMachData_2_CurrentMatch)
+  //Match 2
+  if(NeedToSendMachData_2_CurrentMatch)
   {
     NeedToSendMachData_2_CurrentMatch = false;
     SetCurrentMatchField2(currentMatch_Field2);
+  }
+  if(NeedToSendTeamName2_ToLED > 0 || NeedToSendTeamName2_ToScoreboard > 0)
+  {
+    SendTeamNamesCurrentMatch_2_ToRadio();
     return;
   }
   if(NeedToSendMachData_2_NextMatch)
   {
     NeedToSendMachData_2_NextMatch = false;
     SetNextMatchField2(currentMatch_Field2);
+  }
+  if(NeedToSendTeamName2_NextMatch_ToLED > 0)
+  {
+    SendTeamNamesNextMatch_2_ToRadio();
     return;
   }
   CheckInputState();
@@ -624,6 +717,16 @@ void loop() {
   {
     NeedToNotifyLEDShort2= false;
     SendMatchDataShortToScoreBoard(2);
+  }
+  if(NeedToUpdateLED_T2 > 0)
+  {
+    SendScoresTeam2_ToLed();
+    return;
+  }
+    if(NeedToUpdateLED_T1 > 0)
+  {
+    SendScoresTeam1_ToLed();
+    return;
   }
 }
 
