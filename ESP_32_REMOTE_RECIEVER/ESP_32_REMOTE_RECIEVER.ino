@@ -632,6 +632,8 @@ void loop() {
     Serial.println("Verlauf:");
     if (_radioHistoryData.myVolleyBallHistory[0].Set == false) {
       Serial.print("Keine Sätze gespielt");
+      //update screen !!!
+      mDisplay->UpdateHistory(_radioHistoryData.myVolleyBallHistory,5,sender);
       return;
     }
     for (size_t t = 0; t < 5; t++) {

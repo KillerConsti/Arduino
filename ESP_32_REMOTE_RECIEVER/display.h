@@ -201,6 +201,7 @@ void MyDisplay::UpdateHistory(VolleyBallHistory TheArray[], int n, int sender)
   spr.pushSprite(75, 121);
   spr.deleteSprite();
 digitalWrite(CSPin,HIGH);
+  Serial.println("Called update history ");
 }
 
 void MyDisplay::SetNewScore(int T1, int T2, int S1, int S2,int sender) {
