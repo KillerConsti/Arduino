@@ -185,7 +185,7 @@ void MyDisplay::UpdateHistory(VolleyBallHistory TheArray[], int n, int sender)
     } else {
       //spr.drawString("(1)",5,i*20);
       spr.print("(");
-      int j = TheArray[i].Satz + 1;
+      int j = TheArray[i].Satz;
       spr.print(j);
       spr.print(") ");
       j = (int)TheArray[i].Team1;
