@@ -77,7 +77,7 @@ enum Commands
   MinusT2,
   Swap,
   Reset,
-  SetFinished
+  SetFinished //assign a button is needed
 };
 
 struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes can be sent.
@@ -90,7 +90,13 @@ struct __attribute__((packed)) RadioScorePacket  // Any packet up to 32 bytes ca
   uint32_t FailedTxCount;
 };
 
+//the first one stores CommandId; The second one stores number of tries 
 
+
+
+int mCommandIdToSend = -1;
+int mtries_to_send_radio_msg = 0;
+#define MaxResendTries 3
 
 
 #include "NRFLite.h"
@@ -199,7 +205,7 @@ void GoIntONextChannel()
   delay(2000);
   NeedConnection();
   delay(500);
-   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN,NRFLite::BITRATE250KBPS)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
@@ -241,7 +247,7 @@ void setup() {
   //TODO Implent EEPROM func
   LoadRadioIdsFromEEPROM();
    //init radio
-   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
+   if (!_radio.init(mOurRadioID, PIN_RADIO_CE, PIN_RADIO_CSN,NRFLite::BITRATE250KBPS)) {
     Serial.println("Cannot communicate with radio");
     //while (1)
       ;  // Wait here forever.
@@ -278,24 +284,25 @@ void loop() {
     mTimeLastRadioConnectMessageWasSent = millis();
     return;
   }
+  SendCommandToScoreBoard();
   if(counter == tm.ReadKey16Two())
   return;
-  if(tm.ReadKey16Two() == 9 && !Set_Was_Finished)
+  
+  /*
+  if(tm.ReadKey16Two() == 9 && !Set_Was_Finished) //eliminate this case and give us an extra button pls!
   {
     Set_Was_Finished = true;
     RegisterSet();
     Serial.println("finished set");
     left_up_pressed = true;
     right_up_pressed = true;
-  }
+  }*/
+
+    //store time when we press swap button
+    //short press <-> change sites
+    //long press mirror display
   if(tm.ReadKey16Two() == 512)
   {
-    //store time when we press it
-
-    //short press <-> change sites
-
-    //long press mirror display
-
     time_pressed_swap = millis();
 
   }
@@ -304,20 +311,6 @@ void loop() {
   Serial.printf ("decimal: %s\n",buffer);
   if(tm.ReadKey16Two() == 0) //execute at button up
   {
-    Set_Was_Finished = false;
-    Serial.println("we are here");
-    if(counter  == 1 && left_up_pressed)
-    {
-      left_up_pressed = false;
-      counter = 0;
-      return;
-    }
-    else if( counter == 8 && right_up_pressed)
-    {
-      right_up_pressed = false;
-      counter = 0;
-      return;
-    }
     onPressButton();
   }
   else if (tm.ReadKey16Two() == 1+8+4096+32768)
@@ -327,28 +320,112 @@ void loop() {
     counter = tm.ReadKey16Two();
 	delay(20);
 }
+
+/*enum Commands
+{
+  Connect,
+  PlusT1,
+  MinusT1,
+  PlusT2,
+  MinusT2,
+  Swap,
+  Reset,
+  SetFinished
+};*/
+
+void SendCommandToScoreBoard()
+{
+  if(mtries_to_send_radio_msg <= 0)
+  return;
+  if(mCommandIdToSend <= 0)
+  return;
+  mtries_to_send_radio_msg = mtries_to_send_radio_msg -1;
+  switch(mCommandIdToSend)
+  {
+    case PlusT1:
+    {
+      if(T1Point(1))
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+        case PlusT2:
+    {
+      if(T2Point(1))
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+            case MinusT1:
+    {
+      if(T1Point(-1))
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+                case MinusT2:
+    {
+      if(T2Point(-1))
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+                    case Swap:
+    {
+      if(SawpData())
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+                        case Reset:
+    {
+      if(ResetButton())
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+                        case SetFinished:
+    {
+      if(RegisterSet())
+      {
+        	mtries_to_send_radio_msg = 0;
+      }
+      return;
+    }
+  }
+}
+
 void onPressButton()
 {
+  int mOldRetries =mtries_to_send_radio_msg;
+  mtries_to_send_radio_msg = MaxResendTries;
   switch (counter)
   {
     case 1:
     if(mShowMirrored)
     {
-      T2Point(1);
+      mCommandIdToSend = PlusT2;
     }
     else
     {
-      T1Point(1);
+            mCommandIdToSend = PlusT1;
     }
     return;
     case 4096:
         if(mShowMirrored)
     {
-      T2Point(-1);
+      mCommandIdToSend =MinusT2;
     }
     else
     {
-      T1Point(-1);
+      mCommandIdToSend =   MinusT1;
+;
     }
     return;
     case 8:
@@ -356,11 +433,11 @@ void onPressButton()
             if(mShowMirrored)
     {
       Serial.println("mirrored");
-      T1Point(1);
+      mCommandIdToSend = PlusT1;
     }
     else
     {
-      T2Point(1);
+      mCommandIdToSend = PlusT2;
     }
     return;
     case 32768:
@@ -368,12 +445,12 @@ void onPressButton()
                 if(mShowMirrored)
     {
       Serial.println("mirrored");
-      T1Point(-1);
+      mCommandIdToSend =   MinusT1;
     }
     else
     {
       Serial.println("not mirrored");
-      T2Point(-1);
+      mCommandIdToSend =MinusT2;
     }
     return;
     case 512: //swap
@@ -386,7 +463,7 @@ void onPressButton()
       }
       else
       {
-          SawpData();
+        mCommandIdToSend = Swap;
           Serial.println("swap");
       }
       char buffer[7];         //the ASCII of the integer will be stored in this char array
@@ -396,15 +473,26 @@ void onPressButton()
     }
     case 1024:
     {
-      ResetButton();
+        mCommandIdToSend = Reset;
       Serial.println("reset");
       return;
+    }
+    case 8192:
+    {
+              mCommandIdToSend = SetFinished;
+      Serial.println("SetFinished");
+      return;
+    }
+
+    default:
+    {
+        mtries_to_send_radio_msg = mOldRetries;
     }
     return;
   }
 }
 
-void SawpData()
+bool SawpData()
 {
    _radioCmdData.CommandId = Commands::Swap;
    _radioCmdData.FromRadioId = mOurRadioID;
@@ -412,8 +500,10 @@ void SawpData()
   if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
   {
       Serial.println("SawpData...Success");
+      return true;
     } else {
       Serial.println("SawpData...Failed");
+      return false;
     }
 }
 //this is intern
@@ -422,7 +512,7 @@ void Mirror()
   mShowMirrored = !mShowMirrored;
   UpdateDisplay();
 }
-void ResetButton()
+bool ResetButton()
 {
     _radioCmdData.CommandId = Commands::Reset;
    _radioCmdData.FromRadioId = mOurRadioID;
@@ -430,11 +520,13 @@ void ResetButton()
   if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
   {
       Serial.println("ResetButton...Success");
+      return true;
     } else {
       Serial.println("ResetButton...Failed");
+      return false;
     }
 }
-void T1Point(int point)
+bool T1Point(int point)
 {
     if(point > 0)
    _radioCmdData.CommandId = Commands::PlusT1;
@@ -445,12 +537,14 @@ void T1Point(int point)
     if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
   {
       Serial.println("T1Point...Success");
+      return true;
     } else {
       //Serial.println("T1Point...Failed");
+      return false;
     }
 }
 
-void T2Point(int point)
+bool T2Point(int point)
 {
     if(point > 0)
    _radioCmdData.CommandId = Commands::PlusT2;
@@ -461,8 +555,10 @@ void T2Point(int point)
     if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
   {
       Serial.println("T2Point...Success");
+      return true;
     } else {
       Serial.println("T2Point...Failed");
+      return false;
     }
 }
 
@@ -516,7 +612,7 @@ bool ListenToRadioMessages()
 
 
 
-void RegisterSet()
+bool RegisterSet()
 {
    _radioCmdData.CommandId = Commands::SetFinished;
    _radioCmdData.FromRadioId = mOurRadioID;
@@ -524,7 +620,9 @@ void RegisterSet()
     if(_radio.send(mRadioToSendTo, &_radioCmdData, sizeof(_radioCmdData)))
   {
       Serial.println("RegisterSet...Success");
+      return true;
     } else {
       Serial.println("RegisterSet...Failed");
+      return false;
     }
 }
